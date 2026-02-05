@@ -594,6 +594,8 @@
           diffType.textContent = 'Text diff';
         }
 
+        summarizeIfJson(left, right);
+
         const diffs = dmp.diff_main(left, right);
         dmp.diff_cleanupSemantic(diffs);
 
