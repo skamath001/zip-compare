@@ -1,10 +1,9 @@
-```html
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>ZIP Comparator (Client-Side)</title>
+  <title>ZIP Comparator (Client-Side) V3</title>
 
   <!-- JSZip for reading zip files -->
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -29,6 +28,18 @@
       cursor:pointer;
     }
     button:disabled { opacity:.5; cursor:not-allowed; }
+
+    /* Small “toolbar-ish” buttons */
+    .navbtn {
+      background:transparent;
+      color:var(--text);
+      border:1px solid rgba(231,236,255,.14);
+      padding:7px 10px;
+      border-radius:10px;
+      font-weight:700;
+    }
+    .navbtn:disabled { opacity:.4; cursor:not-allowed; }
+
     .pill { font-size:12px; padding:4px 8px; border-radius:999px; border:1px solid rgba(231,236,255,.15); color:var(--muted); }
     .pill.good { border-color: rgba(122,255,178,.4); color: var(--good); }
     .pill.bad { border-color: rgba(255,122,122,.4); color: var(--bad); }
@@ -59,12 +70,24 @@
       line-height:1.45;
       white-space: pre-wrap;
       word-break: break-word;
+      scroll-behavior: smooth;
     }
     .add { background: rgba(122,255,178,.18); }
     .del { background: rgba(255,122,122,.18); text-decoration: line-through; }
     .hint { font-size:12px; color:var(--muted); }
     .footer { margin-top:18px; font-size:12px; color:var(--muted); }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono"; }
+
+    /* “change chunk” marker + active highlight */
+    .chg {
+      border-radius: 4px;
+      padding: 0 1px;
+    }
+    .chg.active {
+      outline: 2px solid rgba(122,162,255,.85);
+      outline-offset: 2px;
+      background-clip: padding-box;
+    }
   </style>
 </head>
 <body>
@@ -72,7 +95,7 @@
     <h1>ZIP Comparator (client-side)</h1>
     <p>
       Upload two ZIP files. This page compares their contents in your browser (no uploads).
-      It shows added/removed/changed files and a text diff for selected changes.
+      It shows added/removed/changed files and a diff for selected changes.
     </p>
 
     <div class="grid">
@@ -142,6 +165,11 @@
         <strong>Diff</strong>
         <span id="diffPath" class="pill">No file selected</span>
         <span id="diffType" class="pill">—</span>
+
+        <button id="prevChange" class="navbtn" disabled>← Prev change</button>
+        <button id="nextChange" class="navbtn" disabled>Next change →</button>
+        <span id="changeCounter" class="pill">0 / 0</span>
+
         <span class="pill">A vs B</span>
       </div>
       <pre id="diffOut">Select a changed file to see the diff here.</pre>
@@ -171,10 +199,18 @@
 
     const semanticJsonEl = document.getElementById('semanticJson');
 
+    const prevChangeBtn = document.getElementById('prevChange');
+    const nextChangeBtn = document.getElementById('nextChange');
+    const changeCounterEl = document.getElementById('changeCounter');
+
     const dmp = new diff_match_patch();
 
     let zipAFile = null, zipBFile = null;
     let mapA = null, mapB = null; // path -> { isText, text, hash, size }
+
+    // Diff navigation state
+    let changeEls = [];
+    let changeIdx = -1;
 
     function setStatus(text, cls) {
       statusEl.textContent = text;
@@ -196,6 +232,14 @@
       enableIfReady();
     });
 
+    function clearDiffNav() {
+      changeEls = [];
+      changeIdx = -1;
+      prevChangeBtn.disabled = true;
+      nextChangeBtn.disabled = true;
+      changeCounterEl.textContent = '0 / 0';
+    }
+
     function clearUI() {
       addedList.innerHTML = '';
       removedList.innerHTML = '';
@@ -206,6 +250,7 @@
       countAdded.textContent = 'Added: 0';
       countRemoved.textContent = 'Removed: 0';
       countChanged.textContent = 'Changed: 0';
+      clearDiffNav();
     }
 
     // Very small helper hash (not cryptographic) to compare binary quickly
@@ -339,7 +384,109 @@
       return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
+    function setActiveChange(idx) {
+      if (!changeEls.length) {
+        clearDiffNav();
+        return;
+      }
+
+      // clamp
+      if (idx < 0) idx = 0;
+      if (idx >= changeEls.length) idx = changeEls.length - 1;
+
+      // remove old highlight
+      for (const el of changeEls) el.classList.remove('active');
+
+      changeIdx = idx;
+      const el = changeEls[changeIdx];
+      el.classList.add('active');
+
+      // Scroll within the <pre>
+      el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+
+      prevChangeBtn.disabled = (changeIdx <= 0);
+      nextChangeBtn.disabled = (changeIdx >= changeEls.length - 1);
+      changeCounterEl.textContent = `${changeIdx + 1} / ${changeEls.length}`;
+    }
+
+    function buildDiffHtmlWithChangeChunks(diffs) {
+      // We group contiguous insert/delete ops into “chunks” for navigation.
+      // Equal text breaks a chunk.
+      let html = '';
+      let chunkIndex = -1;
+      let inChunk = false;
+      let chunkClass = '';
+
+      function openChunk(cls) {
+        chunkIndex++;
+        inChunk = true;
+        chunkClass = cls;
+        html += `<span class="chg ${cls}" data-chg="${chunkIndex}">`;
+      }
+      function closeChunk() {
+        if (inChunk) {
+          html += `</span>`;
+          inChunk = false;
+          chunkClass = '';
+        }
+      }
+
+      for (const [op, data] of diffs) {
+        const esc = htmlEscape(data);
+
+        if (op === 0) { // equal
+          closeChunk();
+          html += esc;
+          continue;
+        }
+
+        const cls = (op === 1) ? 'add' : 'del';
+
+        // If we're not in a chunk, or chunk type changes (add vs del), start a new chunk.
+        if (!inChunk) openChunk(cls);
+        else if (chunkClass !== cls) { closeChunk(); openChunk(cls); }
+
+        html += esc;
+      }
+
+      closeChunk();
+      return html;
+    }
+
+    function updateChangeListFromDom() {
+      changeEls = Array.from(diffOut.querySelectorAll('.chg'));
+      if (!changeEls.length) {
+        clearDiffNav();
+        return;
+      }
+      prevChangeBtn.disabled = false;
+      nextChangeBtn.disabled = false;
+      setActiveChange(0);
+    }
+
+    prevChangeBtn.addEventListener('click', () => {
+      if (!changeEls.length) return;
+      setActiveChange(changeIdx - 1);
+    });
+    nextChangeBtn.addEventListener('click', () => {
+      if (!changeEls.length) return;
+      setActiveChange(changeIdx + 1);
+    });
+
+    // Optional: keyboard navigation when diff has focus / user is on page
+    document.addEventListener('keydown', (e) => {
+      if (!changeEls.length) return;
+      // Ignore if user is typing in input
+      const tag = (document.activeElement?.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea') return;
+
+      if (e.key === 'n' || e.key === 'N') setActiveChange(changeIdx + 1);
+      if (e.key === 'p' || e.key === 'P') setActiveChange(changeIdx - 1);
+    });
+
     function showDiff(path) {
+      clearDiffNav();
+
       const a = mapA.get(path);
       const b = mapB.get(path);
       diffPath.textContent = path;
@@ -374,14 +521,12 @@
         const diffs = dmp.diff_main(left, right);
         dmp.diff_cleanupSemantic(diffs);
 
-        const parts = diffs.map(([op, data]) => {
-          const esc = htmlEscape(data);
-          if (op === 1) return `<span class="add">${esc}</span>`;
-          if (op === -1) return `<span class="del">${esc}</span>`;
-          return esc;
-        }).join('');
+        // Render, grouping contiguous changes into navigable chunks
+        const html = buildDiffHtmlWithChangeChunks(diffs);
+        diffOut.innerHTML = html || '(no visible differences)';
 
-        diffOut.innerHTML = parts || '(no visible differences)';
+        // Hook up navigation
+        updateChangeListFromDom();
         return;
       }
 
@@ -412,9 +557,9 @@
 
         const common = [...pathsA].filter(p => pathsB.has(p));
         const changed = common.filter(p => {
-          const a = mapA.get(p), b = mapB.get(p);
+          const aa = mapA.get(p), bb = mapB.get(p);
           // compare hashes (works for both text and binary)
-          return a.hash !== b.hash || a.size !== b.size;
+          return aa.hash !== bb.hash || aa.size !== bb.size;
         }).sort();
 
         countAdded.textContent = `Added: ${added.length}`;
@@ -441,4 +586,3 @@
   </script>
 </body>
 </html>
-```
