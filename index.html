@@ -762,65 +762,74 @@ function diffJson(a, b, pathArr = [], out = []) {
   return out;
 }
 
-function renderSummary(diffRecords) {
-  // filter noise
+function renderSummary(diffRecords, rootA, rootB) {
+  // Keep your noise filter if you want
   const meaningful = diffRecords.filter(r => !pathHasNoise(r.pathArr));
 
-  const counts = {
-    total: diffRecords.length,
-    meaningful: meaningful.length,
-    add: meaningful.filter(r => r.type === 'add').length,
-    remove: meaningful.filter(r => r.type === 'remove').length,
-    change: meaningful.filter(r => r.type === 'change').length,
-  };
+  // Group field-related changes by field label
+  const fieldGroups = new Map(); // label -> { label, changes: [] }
+  const other = [];
 
-  // bucketize
-  const buckets = new Map();
   for (const r of meaningful) {
-    const b = bucketForPath(r.pathStr);
-    if (!buckets.has(b)) buckets.set(b, []);
-    buckets.get(b).push(r);
+    const ctx = findFieldContext(rootA, rootB, r);
+    if (!ctx || !ctx.fieldObjA && !ctx.fieldObjB) {
+      other.push(r);
+      continue;
+    }
+
+    const label = fieldLabel(ctx.fieldObjB || ctx.fieldObjA) || '(unknown field)';
+    if (!fieldGroups.has(label)) fieldGroups.set(label, { label, changes: [] });
+
+    // property name (e.g., "visible", "clearOnHide")
+    const prop = ctx.propPath.length ? ctx.propPath.join('.') : '(field itself)';
+
+    fieldGroups.get(label).changes.push({
+      kind: ctx.kind,
+      prop,
+      before: r.before,
+      after: r.after,
+      pathStr: r.pathStr
+    });
   }
 
-  // Produce text
+  // Build output text
   const lines = [];
-  lines.push(`Meaningful changes: ${counts.meaningful} (adds ${counts.add}, removes ${counts.remove}, value changes ${counts.change})`);
+  lines.push(`Field-level changes: ${fieldGroups.size}`);
   lines.push('');
 
-  // Bucket summary
-  for (const [b, recs] of [...buckets.entries()].sort((x,y) => y[1].length - x[1].length)) {
-    lines.push(`${b}: ${recs.length}`);
+  // Print each field block, deduping model/view duplicates by prop
+  for (const g of [...fieldGroups.values()].sort((a,b) => a.label.localeCompare(b.label))) {
+    lines.push(`• ${g.label}`);
+
+    // Dedup: if both model+view change same prop with same before/after, show once
+    const seen = new Set();
+    for (const c of g.changes) {
+      const key = `${c.prop}::${summarizeValueSmart(c.before)}→${summarizeValueSmart(c.after)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      lines.push(`  - ${c.prop}: ${summarizeValueSmart(c.before)} → ${summarizeValueSmart(c.after)}`);
+    }
+    lines.push('');
   }
 
-  lines.push('');
-  lines.push(`Top changes (up to ${TOP_PATHS_TO_SHOW}):`);
-
-  const top = meaningful.slice()
-    .sort((r1, r2) => {
-      // Prefer value-changes over pure add/remove, then shorter paths
-      const score = (r) => (r.type === 'change' ? 2 : 1) * 1000 - r.pathStr.length;
-      return score(r2) - score(r1);
-    })
-    .slice(0, TOP_PATHS_TO_SHOW);
-
-  for (const r of top) {
-    if (r.type === 'change') {
-      lines.push(`- ${r.pathStr}: ${shortVal(r.before)} → ${shortVal(r.after)}`);
-    } else if (r.type === 'add') {
-      lines.push(`+ ${r.pathStr}: ${shortVal(r.after)}`);
-    } else {
-      lines.push(`- ${r.pathStr}: ${shortVal(r.before)}`);
+  if (other.length) {
+    lines.push(`Other changes (non-field): ${other.length}`);
+    lines.push(`(showing up to ${Math.min(TOP_PATHS_TO_SHOW, other.length)})`);
+    for (const r of other.slice(0, TOP_PATHS_TO_SHOW)) {
+      if (r.type === 'change') lines.push(`- ${r.pathStr}: ${summarizeValueSmart(r.before)} → ${summarizeValueSmart(r.after)}`);
+      else if (r.type === 'add') lines.push(`+ ${r.pathStr}: ${summarizeValueSmart(r.after)}`);
+      else lines.push(`- ${r.pathStr}: ${summarizeValueSmart(r.before)}`);
     }
   }
 
-  // Trim lines to keep UI sane
-  const clipped = lines.slice(0, SUMMARY_MAX_LINES);
-  if (lines.length > SUMMARY_MAX_LINES) clipped.push(`… (${lines.length - SUMMARY_MAX_LINES} more lines) …`);
-
-  summaryPill.textContent = `${counts.meaningful} meaningful`;
-  summaryPill.className = counts.meaningful ? 'pill warn' : 'pill good';
-  summaryOut.textContent = clipped.join('\n');
+  // UI
+  const meaningfulCount = meaningful.length;
+  summaryPill.textContent = `${fieldGroups.size} fields`;
+  summaryPill.className = fieldGroups.size ? 'pill warn' : 'pill good';
+  summaryOut.textContent = lines.join('\n');
 }
+
 
 // Call this after you compute text diff (or semantic JSON strings) inside showDiff()
 function summarizeIfJson(leftText, rightText) {
@@ -835,8 +844,107 @@ function summarizeIfJson(leftText, rightText) {
   }
 
   const records = diffJson(a, b);
-  renderSummary(records);
+  renderSummary(records, a, b);
 }
+
+function getAtPath(root, pathArr) {
+  let cur = root;
+  for (const seg of pathArr) {
+    if (cur == null) return undefined;
+    cur = cur[seg];
+  }
+  return cur;
+}
+
+function findFieldContext(rootA, rootB, rec) {
+  // Try to identify if this record belongs to a "field object"
+  const p = rec.pathArr;
+
+  // Case 1: definition.model.fields[i].<prop>
+  // Parent field object is at: definition.model.fields[i]
+  const modelIdx = p.findIndex((seg, i) =>
+    seg === 'definition' &&
+    p[i + 1] === 'model' &&
+    p[i + 2] === 'fields' &&
+    typeof p[i + 3] === 'number'
+  );
+  if (modelIdx >= 0) {
+    const base = p.slice(0, modelIdx + 4); // up to fields[i]
+    return {
+      kind: 'model',
+      basePath: base,
+      fieldObjA: getAtPath(rootA, base),
+      fieldObjB: getAtPath(rootB, base),
+      propPath: p.slice(modelIdx + 4),
+    };
+  }
+
+  // Case 2: definition.view.sections[s].grids[g].fields[f].field.<prop>
+  // Parent field object is at: ...fields[f].field
+  const viewIdx = p.findIndex((seg, i) =>
+    seg === 'definition' &&
+    p[i + 1] === 'view'
+  );
+  if (viewIdx >= 0) {
+    // find "... fields[?].field"
+    for (let i = 0; i < p.length - 2; i++) {
+      if (p[i] === 'fields' && typeof p[i + 1] === 'number' && p[i + 2] === 'field') {
+        const base = p.slice(0, i + 3); // includes 'field'
+        return {
+          kind: 'view',
+          basePath: base,
+          fieldObjA: getAtPath(rootA, base),
+          fieldObjB: getAtPath(rootB, base),
+          propPath: p.slice(i + 3),
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
+function fieldLabel(fieldObj) {
+  if (!fieldObj || typeof fieldObj !== 'object') return null;
+
+  // Try common naming patterns
+  const name =
+    fieldObj.name ??
+    fieldObj.title ??
+    fieldObj.displayName ??
+    fieldObj.label ??
+    fieldObj.fieldName ??
+    fieldObj.fieldId ??
+    fieldObj.id;
+
+  // Also keep a few identifiers if present
+  const id = fieldObj.id ?? fieldObj.fieldId;
+  const fieldName = fieldObj.fieldName;
+
+  let label = name != null ? String(name) : '(unknown field)';
+  const bits = [];
+  if (id != null) bits.push(`id ${id}`);
+  if (fieldName) bits.push(`fieldName ${fieldName}`);
+  if (bits.length) label += ` (${bits.join(', ')})`;
+  return label;
+}
+
+function summarizeValueSmart(v) {
+  // Slightly nicer than {object keys=7}
+  if (v === null) return 'null';
+  if (typeof v === 'string') return JSON.stringify(v);
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  if (Array.isArray(v)) return `[array len=${v.length}]`;
+  if (typeof v === 'object') {
+    // Show key hints for small objects
+    const keys = Object.keys(v);
+    if (keys.length <= 6) return `{ ${keys.join(', ')} }`;
+    return `{object keys=${keys.length}}`;
+  }
+  return String(v);
+}
+
+
 
   </script>
 </body>
