@@ -1,3 +1,4 @@
+```html
 <!doctype html>
 <html lang="en">
 <head>
@@ -99,6 +100,14 @@
           <span class="pill warn" id="countChanged">Changed: 0</span>
         </div>
       </div>
+
+      <!-- Semantic JSON toggle (recommended ON) -->
+      <div class="row" style="margin-top:10px;">
+        <label class="hint" style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="semanticJson" checked />
+          Semantic JSON diff (ignore key order / formatting)
+        </label>
+      </div>
     </div>
 
     <div class="results">
@@ -160,10 +169,12 @@
     const diffPath = document.getElementById('diffPath');
     const diffType = document.getElementById('diffType');
 
+    const semanticJsonEl = document.getElementById('semanticJson');
+
     const dmp = new diff_match_patch();
 
     let zipAFile = null, zipBFile = null;
-    let mapA = null, mapB = null; // path -> { bytes, text, isText, hash }
+    let mapA = null, mapB = null; // path -> { isText, text, hash, size }
 
     function setStatus(text, cls) {
       statusEl.textContent = text;
@@ -249,6 +260,39 @@
       return out;
     }
 
+    // Semantic JSON: sort object keys recursively and pretty-print.
+    function stableStringify(value) {
+      const seen = new WeakSet();
+
+      function canon(v) {
+        if (v === null || typeof v !== 'object') return v;
+
+        if (seen.has(v)) return '[Circular]';
+        seen.add(v);
+
+        if (Array.isArray(v)) return v.map(canon); // order preserved (recommended)
+
+        const out = {};
+        for (const k of Object.keys(v).sort()) out[k] = canon(v[k]);
+        return out;
+      }
+
+      return JSON.stringify(canon(value), null, 2);
+    }
+
+    function trySemanticJson(text) {
+      const t = (text ?? '').trim();
+      if (!t) return null;
+      if (!(t.startsWith('{') || t.startsWith('['))) return null;
+
+      try {
+        const parsed = JSON.parse(t);
+        return stableStringify(parsed);
+      } catch {
+        return null;
+      }
+    }
+
     function renderPathList(container, paths, kind) {
       container.innerHTML = '';
       if (!paths.length) {
@@ -306,13 +350,30 @@
         return;
       }
 
-      // If both look like text, do a real diff
+      // If both look like text, do a real diff (semantic JSON when possible)
       if (a.isText && b.isText) {
-        diffType.textContent = 'Text diff';
-        const diffs = dmp.diff_main(a.text ?? '', b.text ?? '');
+        const semanticOn = !!semanticJsonEl?.checked;
+
+        let left = a.text ?? '';
+        let right = b.text ?? '';
+
+        if (semanticOn) {
+          const canonA = trySemanticJson(left);
+          const canonB = trySemanticJson(right);
+          if (canonA !== null && canonB !== null) {
+            left = canonA;
+            right = canonB;
+            diffType.textContent = 'Semantic JSON diff';
+          } else {
+            diffType.textContent = 'Text diff (JSON parse failed)';
+          }
+        } else {
+          diffType.textContent = 'Text diff';
+        }
+
+        const diffs = dmp.diff_main(left, right);
         dmp.diff_cleanupSemantic(diffs);
 
-        // Render with light markup
         const parts = diffs.map(([op, data]) => {
           const esc = htmlEscape(data);
           if (op === 1) return `<span class="add">${esc}</span>`;
@@ -380,3 +441,4 @@
   </script>
 </body>
 </html>
+```
