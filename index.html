@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>ZIP Comparator (Client-Side) V3</title>
+  <title>ZIP Comparator (Client-Side) v4 </title>
 
   <!-- JSZip for reading zip files -->
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -12,84 +12,142 @@
   <script src="https://cdn.jsdelivr.net/npm/diff-match-patch@1.0.5/index.min.js"></script>
 
   <style>
-    :root { --bg:#0b1020; --card:#121a33; --muted:#9aa6c5; --text:#e7ecff; --accent:#7aa2ff; --bad:#ff7a7a; --good:#7affb2; --warn:#ffd37a; }
-    body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; background:linear-gradient(180deg,#070a14,#0b1020 40%,#070a14); color:var(--text); }
+    :root {
+      --bg:#0b1020;
+      --card:#121a33;
+      --muted:#9aa6c5;
+      --text:#e7ecff;
+      --accent:#7aa2ff;
+      --bad:#ff7a7a;
+      --good:#7affb2;
+      --warn:#ffd37a;
+    }
+
+    body {
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      background:linear-gradient(180deg,#070a14,#0b1020 40%,#070a14);
+      color:var(--text);
+    }
     .wrap { max-width:1100px; margin:0 auto; padding:24px; }
     h1 { margin:0 0 8px; font-size:22px; }
     p { margin:8px 0; color:var(--muted); line-height:1.4; }
+
     .grid { display:grid; grid-template-columns: 1fr 1fr; gap:14px; margin-top:16px; }
-    .card { background:rgba(18,26,51,.85); border:1px solid rgba(122,162,255,.2); border-radius:14px; padding:14px; backdrop-filter: blur(8px); }
+    .card {
+      background:rgba(18,26,51,.85);
+      border:1px solid rgba(122,162,255,.2);
+      border-radius:14px;
+      padding:14px;
+      backdrop-filter: blur(8px);
+    }
     .row { display:flex; gap:10px; align-items:center; flex-wrap: wrap; }
     label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
     input[type=file] { width:100%; }
+
     button {
       background:linear-gradient(90deg, rgba(122,162,255,.9), rgba(122,255,210,.8));
-      border:none; color:#081025; font-weight:700; padding:10px 14px; border-radius:10px;
+      border:none; color:#081025; font-weight:800; padding:10px 14px; border-radius:10px;
       cursor:pointer;
     }
     button:disabled { opacity:.5; cursor:not-allowed; }
 
-    /* Small “toolbar-ish” buttons */
     .navbtn {
       background:transparent;
       color:var(--text);
-      border:1px solid rgba(231,236,255,.14);
+      border:1px solid rgba(231,236,255,.18);
       padding:7px 10px;
       border-radius:10px;
-      font-weight:700;
+      font-weight:800;
+      cursor:pointer;
     }
-    .navbtn:disabled { opacity:.4; cursor:not-allowed; }
+    .navbtn:hover { background:rgba(255,255,255,.05); }
+    .navbtn:disabled { opacity:.45; cursor:not-allowed; }
 
     .pill { font-size:12px; padding:4px 8px; border-radius:999px; border:1px solid rgba(231,236,255,.15); color:var(--muted); }
-    .pill.good { border-color: rgba(122,255,178,.4); color: var(--good); }
-    .pill.bad { border-color: rgba(255,122,122,.4); color: var(--bad); }
-    .pill.warn { border-color: rgba(255,211,122,.4); color: var(--warn); }
+    .pill.good { border-color: rgba(122,255,178,.55); color: var(--good); }
+    .pill.bad { border-color: rgba(255,122,122,.55); color: var(--bad); }
+    .pill.warn { border-color: rgba(255,211,122,.55); color: var(--warn); }
 
     .results { margin-top:14px; display:grid; grid-template-columns: 1fr 1fr; gap:14px; }
     .list { max-height:260px; overflow:auto; border:1px solid rgba(231,236,255,.12); border-radius:12px; padding:10px; }
     .list button {
       background:transparent; color:var(--text); border:1px solid rgba(231,236,255,.12);
-      padding:6px 10px; border-radius:10px; font-weight:600;
+      padding:6px 10px; border-radius:10px; font-weight:700;
+      cursor:pointer;
     }
     .item { display:flex; gap:10px; align-items:center; justify-content:space-between; padding:8px; border-radius:10px; }
     .item:hover { background:rgba(255,255,255,.04); }
-    .path { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono"; font-size:12px; color:#d8e0ff; overflow:hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 660px; }
+
+    .path {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono";
+      font-size:12px; color:#d8e0ff;
+      overflow:hidden; text-overflow: ellipsis; white-space: nowrap;
+      max-width: 660px;
+    }
 
     .diffbox { margin-top:14px; }
     .diffmeta { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+
     pre {
       margin:0;
-      background:rgba(10,14,28,.9);
-      border:1px solid rgba(231,236,255,.12);
+      background:rgba(10,14,28,.95);
+      border:1px solid rgba(231,236,255,.14);
       border-radius:12px;
       padding:12px;
       overflow:auto;
-      max-height: 420px;
+      max-height: 460px;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono";
       font-size:12px;
-      line-height:1.45;
+      line-height:1.5;
       white-space: pre-wrap;
       word-break: break-word;
       scroll-behavior: smooth;
     }
-    .add { background: rgba(122,255,178,.18); }
-    .del { background: rgba(255,122,122,.18); text-decoration: line-through; }
-    .hint { font-size:12px; color:var(--muted); }
-    .footer { margin-top:18px; font-size:12px; color:var(--muted); }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono"; }
 
-    /* “change chunk” marker + active highlight */
-    .chg {
-      border-radius: 4px;
-      padding: 0 1px;
+    /* Higher-contrast diff colors */
+    .add {
+      background: rgba(40, 220, 120, .28);
+      border: 1px solid rgba(40, 220, 120, .55);
+      color: rgba(235, 255, 245, .98);
+      border-radius: 5px;
+      padding: 0 2px;
     }
+    .del {
+      background: rgba(255, 85, 85, .28);
+      border: 1px solid rgba(255, 85, 85, .55);
+      color: rgba(255, 240, 240, .98);
+      border-radius: 5px;
+      padding: 0 2px;
+      text-decoration: line-through;
+    }
+
+    /* Change chunk wrapper + active highlight */
+    .chg { border-radius: 6px; padding: 0 2px; }
     .chg.active {
-      outline: 2px solid rgba(122,162,255,.85);
-      outline-offset: 2px;
-      background-clip: padding-box;
+      outline: 2px solid rgba(122,162,255,.95);
+      outline-offset: 3px;
+      box-shadow: 0 0 0 3px rgba(122,162,255,.18), 0 0 18px rgba(122,162,255,.22);
     }
+
+    /* Collapsed unchanged marker */
+    .collapsed {
+      display: inline-block;
+      margin: 6px 0;
+      padding: 4px 8px;
+      border-radius: 10px;
+      border: 1px dashed rgba(231,236,255,.22);
+      color: rgba(231,236,255,.72);
+      background: rgba(255,255,255,.03);
+      font-style: italic;
+    }
+
+    .hint { font-size:12px; color:var(--muted); }
+    .footer { margin-top:12px; font-size:12px; color:var(--muted); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono"; }
   </style>
 </head>
+
 <body>
   <div class="wrap">
     <h1>ZIP Comparator (client-side)</h1>
@@ -124,12 +182,12 @@
         </div>
       </div>
 
-      <!-- Semantic JSON toggle (recommended ON) -->
       <div class="row" style="margin-top:10px;">
         <label class="hint" style="display:flex;align-items:center;gap:8px;">
           <input type="checkbox" id="semanticJson" checked />
           Semantic JSON diff (ignore key order / formatting)
         </label>
+        <span class="pill">Keys: n/p/Home/End</span>
       </div>
     </div>
 
@@ -147,6 +205,7 @@
           <strong>Added / Removed</strong>
           <span class="pill">paths</span>
         </div>
+
         <div class="row" style="gap:14px; margin-top:10px;">
           <div style="flex:1;">
             <div class="hint">Added in ZIP B</div>
@@ -160,24 +219,36 @@
       </div>
     </div>
 
+<div class="card" style="margin-top:14px;">
+  <div class="row" style="justify-content:space-between;">
+    <strong>Summary</strong>
+    <span id="summaryPill" class="pill">—</span>
+  </div>
+  <pre id="summaryOut" style="margin-top:10px;">Select a changed file to generate a summary.</pre>
+</div>
+
     <div class="card diffbox">
       <div class="diffmeta">
         <strong>Diff</strong>
         <span id="diffPath" class="pill">No file selected</span>
         <span id="diffType" class="pill">—</span>
 
-        <button id="prevChange" class="navbtn" disabled>← Prev change</button>
-        <button id="nextChange" class="navbtn" disabled>Next change →</button>
+        <button id="prevChange" class="navbtn" disabled>← Prev</button>
+        <button id="nextChange" class="navbtn" disabled>Next →</button>
         <span id="changeCounter" class="pill">0 / 0</span>
-
-        <span class="pill">A vs B</span>
       </div>
+
       <pre id="diffOut">Select a changed file to see the diff here.</pre>
+
       <div class="footer">
-        Notes: This compares text content for common text/JSON files. If a file looks binary, it will show a hash change instead.
+        Notes:
+        - Unchanged regions are collapsed when very long.
+        - Keyboard: <span class="mono">n</span> next, <span class="mono">p</span> prev, <span class="mono">Home</span>/<span class="mono">End</span>.
       </div>
     </div>
   </div>
+
+  
 
   <script>
     const zipAInput = document.getElementById('zipA');
@@ -219,8 +290,7 @@
 
     function enableIfReady() {
       compareBtn.disabled = !(zipAFile && zipBFile);
-      if (zipAFile && zipBFile) setStatus('Ready to compare', 'good');
-      else setStatus('Waiting for files…', '');
+      setStatus(zipAFile && zipBFile ? 'Ready to compare' : 'Waiting for files…', zipAFile && zipBFile ? 'good' : '');
     }
 
     zipAInput.addEventListener('change', e => {
@@ -265,8 +335,6 @@
     }
 
     function looksText(u8) {
-      // Heuristic: allow tab/newline/cr + printable ASCII, and tolerate a little UTF-8.
-      // If many NUL bytes, treat as binary.
       let nul = 0, weird = 0;
       const len = Math.min(u8.length, 5000);
       for (let i = 0; i < len; i++) {
@@ -291,7 +359,6 @@
         let text = null;
         if (isText) {
           text = await entry.async('string');
-          // normalize line endings for stable diffs
           text = text.replace(/\r\n/g, '\n');
         }
 
@@ -308,20 +375,15 @@
     // Semantic JSON: sort object keys recursively and pretty-print.
     function stableStringify(value) {
       const seen = new WeakSet();
-
       function canon(v) {
         if (v === null || typeof v !== 'object') return v;
-
         if (seen.has(v)) return '[Circular]';
         seen.add(v);
-
-        if (Array.isArray(v)) return v.map(canon); // order preserved (recommended)
-
+        if (Array.isArray(v)) return v.map(canon); // keep order (recommended)
         const out = {};
         for (const k of Object.keys(v).sort()) out[k] = canon(v[k]);
         return out;
       }
-
       return JSON.stringify(canon(value), null, 2);
     }
 
@@ -329,7 +391,6 @@
       const t = (text ?? '').trim();
       if (!t) return null;
       if (!(t.startsWith('{') || t.startsWith('['))) return null;
-
       try {
         const parsed = JSON.parse(t);
         return stableStringify(parsed);
@@ -365,6 +426,7 @@
       for (const p of paths) {
         const row = document.createElement('div');
         row.className = 'item';
+
         const btn = document.createElement('button');
         btn.textContent = 'View diff';
         btn.addEventListener('click', () => showDiff(p));
@@ -381,7 +443,19 @@
     }
 
     function htmlEscape(s) {
-      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return (s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    // Collapse long unchanged regions (measured by lines).
+    // Keep a little context at start/end of that unchanged block.
+    const COLLAPSE_IF_LINES_OVER = 120;
+    const KEEP_CONTEXT_LINES = 18;
+
+    function escapeCollapsedMarker(n) {
+      return `<span class="collapsed">… ${n} unchanged lines hidden …</span>\n`;
     }
 
     function setActiveChange(idx) {
@@ -389,19 +463,12 @@
         clearDiffNav();
         return;
       }
-
-      // clamp
-      if (idx < 0) idx = 0;
-      if (idx >= changeEls.length) idx = changeEls.length - 1;
-
-      // remove old highlight
-      for (const el of changeEls) el.classList.remove('active');
-
+      idx = Math.max(0, Math.min(idx, changeEls.length - 1));
+      changeEls.forEach(el => el.classList.remove('active'));
       changeIdx = idx;
+
       const el = changeEls[changeIdx];
       el.classList.add('active');
-
-      // Scroll within the <pre>
       el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
 
       prevChangeBtn.disabled = (changeIdx <= 0);
@@ -409,51 +476,7 @@
       changeCounterEl.textContent = `${changeIdx + 1} / ${changeEls.length}`;
     }
 
-    function buildDiffHtmlWithChangeChunks(diffs) {
-      // We group contiguous insert/delete ops into “chunks” for navigation.
-      // Equal text breaks a chunk.
-      let html = '';
-      let chunkIndex = -1;
-      let inChunk = false;
-      let chunkClass = '';
-
-      function openChunk(cls) {
-        chunkIndex++;
-        inChunk = true;
-        chunkClass = cls;
-        html += `<span class="chg ${cls}" data-chg="${chunkIndex}">`;
-      }
-      function closeChunk() {
-        if (inChunk) {
-          html += `</span>`;
-          inChunk = false;
-          chunkClass = '';
-        }
-      }
-
-      for (const [op, data] of diffs) {
-        const esc = htmlEscape(data);
-
-        if (op === 0) { // equal
-          closeChunk();
-          html += esc;
-          continue;
-        }
-
-        const cls = (op === 1) ? 'add' : 'del';
-
-        // If we're not in a chunk, or chunk type changes (add vs del), start a new chunk.
-        if (!inChunk) openChunk(cls);
-        else if (chunkClass !== cls) { closeChunk(); openChunk(cls); }
-
-        html += esc;
-      }
-
-      closeChunk();
-      return html;
-    }
-
-    function updateChangeListFromDom() {
+    function refreshChangeList() {
       changeEls = Array.from(diffOut.querySelectorAll('.chg'));
       if (!changeEls.length) {
         clearDiffNav();
@@ -464,25 +487,79 @@
       setActiveChange(0);
     }
 
-    prevChangeBtn.addEventListener('click', () => {
-      if (!changeEls.length) return;
-      setActiveChange(changeIdx - 1);
-    });
-    nextChangeBtn.addEventListener('click', () => {
-      if (!changeEls.length) return;
-      setActiveChange(changeIdx + 1);
-    });
+    prevChangeBtn.addEventListener('click', () => setActiveChange(changeIdx - 1));
+    nextChangeBtn.addEventListener('click', () => setActiveChange(changeIdx + 1));
 
-    // Optional: keyboard navigation when diff has focus / user is on page
+    // Keyboard navigation: n/p/Home/End
     document.addEventListener('keydown', (e) => {
       if (!changeEls.length) return;
-      // Ignore if user is typing in input
+
       const tag = (document.activeElement?.tagName || '').toLowerCase();
       if (tag === 'input' || tag === 'textarea') return;
 
-      if (e.key === 'n' || e.key === 'N') setActiveChange(changeIdx + 1);
-      if (e.key === 'p' || e.key === 'P') setActiveChange(changeIdx - 1);
+      if (e.key === 'n' || e.key === 'N') { e.preventDefault(); setActiveChange(changeIdx + 1); }
+      else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); setActiveChange(changeIdx - 1); }
+      else if (e.key === 'Home') { e.preventDefault(); setActiveChange(0); }
+      else if (e.key === 'End') { e.preventDefault(); setActiveChange(changeEls.length - 1); }
+      else if (e.key === 'Enter') { e.preventDefault(); setActiveChange(0); }
     });
+
+    // Build diff HTML:
+    // - wraps contiguous add/del regions in navigable chunks (.chg)
+    // - collapses very long equal regions into an ellipsis marker
+    function buildDiffHtml(diffs) {
+      let html = '';
+      let inChunk = false;
+      let chunkType = '';
+
+      function openChunk(cls) {
+        inChunk = true;
+        chunkType = cls;
+        html += `<span class="chg ${cls}">`;
+      }
+      function closeChunk() {
+        if (inChunk) html += `</span>`;
+        inChunk = false;
+        chunkType = '';
+      }
+
+      function maybeCollapseEqualText(equalText) {
+        // Convert to lines (preserve trailing newline if exists)
+        const lines = equalText.split('\n');
+        const lineCount = lines.length - 1; // because split keeps last empty after trailing \n
+        if (lineCount <= COLLAPSE_IF_LINES_OVER) {
+          html += htmlEscape(equalText);
+          return;
+        }
+
+        // Keep head/tail context
+        const head = lines.slice(0, KEEP_CONTEXT_LINES).join('\n') + '\n';
+        const tail = '\n' + lines.slice(Math.max(0, lines.length - KEEP_CONTEXT_LINES - 1)).join('\n');
+        const hidden = Math.max(0, lineCount - (KEEP_CONTEXT_LINES * 2));
+
+        html += htmlEscape(head);
+        html += escapeCollapsedMarker(hidden);
+        html += htmlEscape(tail);
+      }
+
+      for (const [op, data] of diffs) {
+        if (op === 0) {
+          closeChunk();
+          maybeCollapseEqualText(data);
+          continue;
+        }
+
+        const cls = (op === 1) ? 'add' : 'del';
+
+        if (!inChunk) openChunk(cls);
+        else if (chunkType !== cls) { closeChunk(); openChunk(cls); }
+
+        html += htmlEscape(data);
+      }
+
+      closeChunk();
+      return html;
+    }
 
     function showDiff(path) {
       clearDiffNav();
@@ -497,7 +574,6 @@
         return;
       }
 
-      // If both look like text, do a real diff (semantic JSON when possible)
       if (a.isText && b.isText) {
         const semanticOn = !!semanticJsonEl?.checked;
 
@@ -521,16 +597,11 @@
         const diffs = dmp.diff_main(left, right);
         dmp.diff_cleanupSemantic(diffs);
 
-        // Render, grouping contiguous changes into navigable chunks
-        const html = buildDiffHtmlWithChangeChunks(diffs);
-        diffOut.innerHTML = html || '(no visible differences)';
-
-        // Hook up navigation
-        updateChangeListFromDom();
+        diffOut.innerHTML = buildDiffHtml(diffs) || '(no visible differences)';
+        refreshChangeList();
         return;
       }
 
-      // Otherwise show hash comparison
       diffType.textContent = 'Binary/hash diff';
       diffOut.textContent =
         `Binary or non-text content detected.\n\n` +
@@ -558,7 +629,6 @@
         const common = [...pathsA].filter(p => pathsB.has(p));
         const changed = common.filter(p => {
           const aa = mapA.get(p), bb = mapB.get(p);
-          // compare hashes (works for both text and binary)
           return aa.hash !== bb.hash || aa.size !== bb.size;
         }).sort();
 
@@ -570,11 +640,12 @@
         renderPathList(removedList, removed, 'bad');
         renderChangedList(changed);
 
-        if (changed.length === 0 && added.length === 0 && removed.length === 0) {
-          setStatus('No differences found ✅', 'good');
-        } else {
-          setStatus('Comparison complete', 'good');
-        }
+        setStatus(
+          (changed.length === 0 && added.length === 0 && removed.length === 0)
+            ? 'No differences found ✅'
+            : 'Comparison complete',
+          'good'
+        );
       } catch (err) {
         console.error(err);
         setStatus('Error parsing ZIP(s)', 'bad');
@@ -583,6 +654,188 @@
         compareBtn.disabled = false;
       }
     });
+
+    // -------------------------
+// JSON semantic summary (no AI)
+// -------------------------
+
+const summaryOut = document.getElementById('summaryOut');
+const summaryPill = document.getElementById('summaryPill');
+
+// Tweak to your liking
+const SUMMARY_MAX_LINES = 60;
+const TOP_PATHS_TO_SHOW = 30;
+
+// Common metadata/noise keys to ignore (matches any path segment)
+const NOISE_KEYS = new Set([
+  "created", "updated", "createdAt", "updatedAt", "lastPublished",
+  "createdBy", "updatedBy", "lastModifiedBy",
+  "version", "nameAndVersion", // <-- if you WANT these, remove them
+  "__typename"
+]);
+
+// If you want to keep version/nameAndVersion in summary, comment them out above.
+
+function tryParseJsonOrNull(text) {
+  const t = (text ?? '').trim();
+  if (!t) return null;
+  if (!(t.startsWith('{') || t.startsWith('['))) return null;
+  try { return JSON.parse(t); } catch { return null; }
+}
+
+function isPrimitive(v) {
+  return v === null || typeof v !== 'object';
+}
+
+function shortVal(v, max = 80) {
+  let s;
+  if (typeof v === 'string') s = JSON.stringify(v);
+  else if (typeof v === 'number' || typeof v === 'boolean' || v === null) s = String(v);
+  else if (Array.isArray(v)) s = `[array len=${v.length}]`;
+  else s = `{object keys=${Object.keys(v).length}}`;
+  if (s.length > max) s = s.slice(0, max - 1) + '…';
+  return s;
+}
+
+function pathToString(pathArr) {
+  // Use JSON-pointer-ish style, but keep [i] for readability
+  return pathArr.map(seg => typeof seg === 'number' ? `[${seg}]` : (seg.includes('/') ? `["${seg}"]` : `.${seg}`)).join('').replace(/^\./, '');
+}
+
+function pathHasNoise(pathArr) {
+  return pathArr.some(seg => typeof seg === 'string' && NOISE_KEYS.has(seg));
+}
+
+// A few buckets tailored for your domain-ish data.
+// You can add patterns as you see more diffs.
+function bucketForPath(pathStr) {
+  const p = pathStr;
+
+  if (/tenantId|environment|releaseVersion|systemId|systemType/i.test(p)) return "Environment / Tenant";
+  if (/version|nameAndVersion|engagementId|requestId|processId|taskId|id$/i.test(p)) return "IDs & Versions";
+  if (/visible|clearOnHide|hidden|display|sections|grids|fields/i.test(p)) return "UI / Visibility";
+  if (/status|processing|completed|started|estimatedCompletion|resubmission/i.test(p)) return "Workflow / Status";
+  if (/amount|currency|money|cost|price/i.test(p)) return "Money";
+  if (/contacts|requester|coOwners|members|users|groupIds/i.test(p)) return "People / Assignments";
+  return "Other";
+}
+
+// Diff output record:
+// { type: 'add'|'remove'|'change', pathArr, pathStr, before, after }
+function diffJson(a, b, pathArr = [], out = []) {
+  if (a === b) return out;
+
+  // Handle primitives directly
+  if (isPrimitive(a) || isPrimitive(b)) {
+    out.push({ type: 'change', pathArr, pathStr: pathToString(pathArr), before: a, after: b });
+    return out;
+  }
+
+  // Arrays
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b)) {
+      out.push({ type: 'change', pathArr, pathStr: pathToString(pathArr), before: a, after: b });
+      return out;
+    }
+    const max = Math.max(a.length, b.length);
+    for (let i = 0; i < max; i++) {
+      if (i >= a.length) out.push({ type: 'add', pathArr: [...pathArr, i], pathStr: pathToString([...pathArr, i]), before: undefined, after: b[i] });
+      else if (i >= b.length) out.push({ type: 'remove', pathArr: [...pathArr, i], pathStr: pathToString([...pathArr, i]), before: a[i], after: undefined });
+      else diffJson(a[i], b[i], [...pathArr, i], out);
+    }
+    return out;
+  }
+
+  // Objects
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const k of [...keys].sort()) {
+    const hasA = Object.prototype.hasOwnProperty.call(a, k);
+    const hasB = Object.prototype.hasOwnProperty.call(b, k);
+    const nextPath = [...pathArr, k];
+
+    if (!hasA && hasB) out.push({ type: 'add', pathArr: nextPath, pathStr: pathToString(nextPath), before: undefined, after: b[k] });
+    else if (hasA && !hasB) out.push({ type: 'remove', pathArr: nextPath, pathStr: pathToString(nextPath), before: a[k], after: undefined });
+    else diffJson(a[k], b[k], nextPath, out);
+  }
+  return out;
+}
+
+function renderSummary(diffRecords) {
+  // filter noise
+  const meaningful = diffRecords.filter(r => !pathHasNoise(r.pathArr));
+
+  const counts = {
+    total: diffRecords.length,
+    meaningful: meaningful.length,
+    add: meaningful.filter(r => r.type === 'add').length,
+    remove: meaningful.filter(r => r.type === 'remove').length,
+    change: meaningful.filter(r => r.type === 'change').length,
+  };
+
+  // bucketize
+  const buckets = new Map();
+  for (const r of meaningful) {
+    const b = bucketForPath(r.pathStr);
+    if (!buckets.has(b)) buckets.set(b, []);
+    buckets.get(b).push(r);
+  }
+
+  // Produce text
+  const lines = [];
+  lines.push(`Meaningful changes: ${counts.meaningful} (adds ${counts.add}, removes ${counts.remove}, value changes ${counts.change})`);
+  lines.push('');
+
+  // Bucket summary
+  for (const [b, recs] of [...buckets.entries()].sort((x,y) => y[1].length - x[1].length)) {
+    lines.push(`${b}: ${recs.length}`);
+  }
+
+  lines.push('');
+  lines.push(`Top changes (up to ${TOP_PATHS_TO_SHOW}):`);
+
+  const top = meaningful.slice()
+    .sort((r1, r2) => {
+      // Prefer value-changes over pure add/remove, then shorter paths
+      const score = (r) => (r.type === 'change' ? 2 : 1) * 1000 - r.pathStr.length;
+      return score(r2) - score(r1);
+    })
+    .slice(0, TOP_PATHS_TO_SHOW);
+
+  for (const r of top) {
+    if (r.type === 'change') {
+      lines.push(`- ${r.pathStr}: ${shortVal(r.before)} → ${shortVal(r.after)}`);
+    } else if (r.type === 'add') {
+      lines.push(`+ ${r.pathStr}: ${shortVal(r.after)}`);
+    } else {
+      lines.push(`- ${r.pathStr}: ${shortVal(r.before)}`);
+    }
+  }
+
+  // Trim lines to keep UI sane
+  const clipped = lines.slice(0, SUMMARY_MAX_LINES);
+  if (lines.length > SUMMARY_MAX_LINES) clipped.push(`… (${lines.length - SUMMARY_MAX_LINES} more lines) …`);
+
+  summaryPill.textContent = `${counts.meaningful} meaningful`;
+  summaryPill.className = counts.meaningful ? 'pill warn' : 'pill good';
+  summaryOut.textContent = clipped.join('\n');
+}
+
+// Call this after you compute text diff (or semantic JSON strings) inside showDiff()
+function summarizeIfJson(leftText, rightText) {
+  const a = tryParseJsonOrNull(leftText);
+  const b = tryParseJsonOrNull(rightText);
+
+  if (!a || !b) {
+    summaryPill.textContent = 'Not JSON';
+    summaryPill.className = 'pill';
+    summaryOut.textContent = 'Summary is available only when both sides are valid JSON.';
+    return;
+  }
+
+  const records = diffJson(a, b);
+  renderSummary(records);
+}
+
   </script>
 </body>
 </html>
