@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ZIP Comparator (Client-Side)</title>
+
+  <!-- JSZip for reading zip files -->
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+  <!-- diff-match-patch for text diffs -->
+  <script src="https://cdn.jsdelivr.net/npm/diff-match-patch@1.0.5/index.min.js"></script>
+
+  <style>
+    :root { --bg:#0b1020; --card:#121a33; --muted:#9aa6c5; --text:#e7ecff; --accent:#7aa2ff; --bad:#ff7a7a; --good:#7affb2; --warn:#ffd37a; }
+    body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; background:linear-gradient(180deg,#070a14,#0b1020 40%,#070a14); color:var(--text); }
+    .wrap { max-width:1100px; margin:0 auto; padding:24px; }
+    h1 { margin:0 0 8px; font-size:22px; }
+    p { margin:8px 0; color:var(--muted); line-height:1.4; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:14px; margin-top:16px; }
+    .card { background:rgba(18,26,51,.85); border:1px solid rgba(122,162,255,.2); border-radius:14px; padding:14px; backdrop-filter: blur(8px); }
+    .row { display:flex; gap:10px; align-items:center; flex-wrap: wrap; }
+    label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
+    input[type=file] { width:100%; }
+    button {
+      background:linear-gradient(90deg, rgba(122,162,255,.9), rgba(122,255,210,.8));
+      border:none; color:#081025; font-weight:700; padding:10px 14px; border-radius:10px;
+      cursor:pointer;
+    }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    .pill { font-size:12px; padding:4px 8px; border-radius:999px; border:1px solid rgba(231,236,255,.15); color:var(--muted); }
+    .pill.good { border-color: rgba(122,255,178,.4); color: var(--good); }
+    .pill.bad { border-color: rgba(255,122,122,.4); color: var(--bad); }
+    .pill.warn { border-color: rgba(255,211,122,.4); color: var(--warn); }
+
+    .results { margin-top:14px; display:grid; grid-template-columns: 1fr 1fr; gap:14px; }
+    .list { max-height:260px; overflow:auto; border:1px solid rgba(231,236,255,.12); border-radius:12px; padding:10px; }
+    .list button {
+      background:transparent; color:var(--text); border:1px solid rgba(231,236,255,.12);
+      padding:6px 10px; border-radius:10px; font-weight:600;
+    }
+    .item { display:flex; gap:10px; align-items:center; justify-content:space-between; padding:8px; border-radius:10px; }
+    .item:hover { background:rgba(255,255,255,.04); }
+    .path { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono"; font-size:12px; color:#d8e0ff; overflow:hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 660px; }
+
+    .diffbox { margin-top:14px; }
+    .diffmeta { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+    pre {
+      margin:0;
+      background:rgba(10,14,28,.9);
+      border:1px solid rgba(231,236,255,.12);
+      border-radius:12px;
+      padding:12px;
+      overflow:auto;
+      max-height: 420px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono";
+      font-size:12px;
+      line-height:1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .add { background: rgba(122,255,178,.18); }
+    .del { background: rgba(255,122,122,.18); text-decoration: line-through; }
+    .hint { font-size:12px; color:var(--muted); }
+    .footer { margin-top:18px; font-size:12px; color:var(--muted); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono"; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>ZIP Comparator (client-side)</h1>
+    <p>
+      Upload two ZIP files. This page compares their contents in your browser (no uploads).
+      It shows added/removed/changed files and a text diff for selected changes.
+    </p>
+
+    <div class="grid">
+      <div class="card">
+        <label>ZIP A</label>
+        <input id="zipA" type="file" accept=".zip" />
+        <p class="hint">Example: <span class="mono">Intake additional information (1).zip</span></p>
+      </div>
+      <div class="card">
+        <label>ZIP B</label>
+        <input id="zipB" type="file" accept=".zip" />
+        <p class="hint">Example: <span class="mono">Intake additional information (3).zip</span></p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px;">
+      <div class="row" style="justify-content:space-between;">
+        <div class="row">
+          <button id="compareBtn" disabled>Compare</button>
+          <span id="status" class="pill">Waiting for files…</span>
+        </div>
+        <div class="row">
+          <span class="pill good" id="countAdded">Added: 0</span>
+          <span class="pill bad" id="countRemoved">Removed: 0</span>
+          <span class="pill warn" id="countChanged">Changed: 0</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="results">
+      <div class="card">
+        <div class="row" style="justify-content:space-between;">
+          <strong>Changed files</strong>
+          <span class="pill warn">click to view diff</span>
+        </div>
+        <div id="changedList" class="list" style="margin-top:10px;"></div>
+      </div>
+
+      <div class="card">
+        <div class="row" style="justify-content:space-between;">
+          <strong>Added / Removed</strong>
+          <span class="pill">paths</span>
+        </div>
+        <div class="row" style="gap:14px; margin-top:10px;">
+          <div style="flex:1;">
+            <div class="hint">Added in ZIP B</div>
+            <div id="addedList" class="list" style="margin-top:8px;"></div>
+          </div>
+          <div style="flex:1;">
+            <div class="hint">Removed from ZIP A</div>
+            <div id="removedList" class="list" style="margin-top:8px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card diffbox">
+      <div class="diffmeta">
+        <strong>Diff</strong>
+        <span id="diffPath" class="pill">No file selected</span>
+        <span id="diffType" class="pill">—</span>
+        <span class="pill">A vs B</span>
+      </div>
+      <pre id="diffOut">Select a changed file to see the diff here.</pre>
+      <div class="footer">
+        Notes: This compares text content for common text/JSON files. If a file looks binary, it will show a hash change instead.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const zipAInput = document.getElementById('zipA');
+    const zipBInput = document.getElementById('zipB');
+    const compareBtn = document.getElementById('compareBtn');
+    const statusEl = document.getElementById('status');
+
+    const countAdded = document.getElementById('countAdded');
+    const countRemoved = document.getElementById('countRemoved');
+    const countChanged = document.getElementById('countChanged');
+
+    const addedList = document.getElementById('addedList');
+    const removedList = document.getElementById('removedList');
+    const changedList = document.getElementById('changedList');
+
+    const diffOut = document.getElementById('diffOut');
+    const diffPath = document.getElementById('diffPath');
+    const diffType = document.getElementById('diffType');
+
+    const dmp = new diff_match_patch();
+
+    let zipAFile = null, zipBFile = null;
+    let mapA = null, mapB = null; // path -> { bytes, text, isText, hash }
+
+    function setStatus(text, cls) {
+      statusEl.textContent = text;
+      statusEl.className = `pill ${cls || ''}`.trim();
+    }
+
+    function enableIfReady() {
+      compareBtn.disabled = !(zipAFile && zipBFile);
+      if (zipAFile && zipBFile) setStatus('Ready to compare', 'good');
+      else setStatus('Waiting for files…', '');
+    }
+
+    zipAInput.addEventListener('change', e => {
+      zipAFile = e.target.files?.[0] || null;
+      enableIfReady();
+    });
+    zipBInput.addEventListener('change', e => {
+      zipBFile = e.target.files?.[0] || null;
+      enableIfReady();
+    });
+
+    function clearUI() {
+      addedList.innerHTML = '';
+      removedList.innerHTML = '';
+      changedList.innerHTML = '';
+      diffOut.textContent = 'Select a changed file to see the diff here.';
+      diffPath.textContent = 'No file selected';
+      diffType.textContent = '—';
+      countAdded.textContent = 'Added: 0';
+      countRemoved.textContent = 'Removed: 0';
+      countChanged.textContent = 'Changed: 0';
+    }
+
+    // Very small helper hash (not cryptographic) to compare binary quickly
+    function fnv1a(buf) {
+      let h = 0x811c9dc5;
+      const v = new Uint8Array(buf);
+      for (let i = 0; i < v.length; i++) {
+        h ^= v[i];
+        h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+      }
+      return ('0000000' + h.toString(16)).slice(-8);
+    }
+
+    function looksText(u8) {
+      // Heuristic: allow tab/newline/cr + printable ASCII, and tolerate a little UTF-8.
+      // If many NUL bytes, treat as binary.
+      let nul = 0, weird = 0;
+      const len = Math.min(u8.length, 5000);
+      for (let i = 0; i < len; i++) {
+        const c = u8[i];
+        if (c === 0) nul++;
+        else if (c < 7 || (c > 13 && c < 32)) weird++;
+      }
+      if (nul > 0) return false;
+      return weird / len < 0.02;
+    }
+
+    async function loadZipToMap(file) {
+      const zip = await JSZip.loadAsync(file);
+      const out = new Map();
+      const entries = Object.values(zip.files).filter(f => !f.dir);
+
+      for (const entry of entries) {
+        const bytes = await entry.async('arraybuffer');
+        const u8 = new Uint8Array(bytes);
+        const isText = looksText(u8);
+
+        let text = null;
+        if (isText) {
+          text = await entry.async('string');
+          // normalize line endings for stable diffs
+          text = text.replace(/\r\n/g, '\n');
+        }
+
+        out.set(entry.name, {
+          isText,
+          text,
+          hash: fnv1a(bytes),
+          size: u8.length,
+        });
+      }
+      return out;
+    }
+
+    function renderPathList(container, paths, kind) {
+      container.innerHTML = '';
+      if (!paths.length) {
+        container.innerHTML = `<div class="hint" style="padding:8px;">None</div>`;
+        return;
+      }
+      for (const p of paths) {
+        const div = document.createElement('div');
+        div.className = 'item';
+        div.innerHTML = `
+          <div class="path" title="${p}">${p}</div>
+          <span class="pill ${kind}">${kind.toUpperCase()}</span>
+        `;
+        container.appendChild(div);
+      }
+    }
+
+    function renderChangedList(paths) {
+      changedList.innerHTML = '';
+      if (!paths.length) {
+        changedList.innerHTML = `<div class="hint" style="padding:8px;">No changed files</div>`;
+        return;
+      }
+
+      for (const p of paths) {
+        const row = document.createElement('div');
+        row.className = 'item';
+        const btn = document.createElement('button');
+        btn.textContent = 'View diff';
+        btn.addEventListener('click', () => showDiff(p));
+
+        const left = document.createElement('div');
+        left.className = 'path';
+        left.title = p;
+        left.textContent = p;
+
+        row.appendChild(left);
+        row.appendChild(btn);
+        changedList.appendChild(row);
+      }
+    }
+
+    function htmlEscape(s) {
+      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function showDiff(path) {
+      const a = mapA.get(path);
+      const b = mapB.get(path);
+      diffPath.textContent = path;
+
+      if (!a || !b) {
+        diffType.textContent = 'Missing on one side';
+        diffOut.textContent = 'Cannot diff: file missing on one side.';
+        return;
+      }
+
+      // If both look like text, do a real diff
+      if (a.isText && b.isText) {
+        diffType.textContent = 'Text diff';
+        const diffs = dmp.diff_main(a.text ?? '', b.text ?? '');
+        dmp.diff_cleanupSemantic(diffs);
+
+        // Render with light markup
+        const parts = diffs.map(([op, data]) => {
+          const esc = htmlEscape(data);
+          if (op === 1) return `<span class="add">${esc}</span>`;
+          if (op === -1) return `<span class="del">${esc}</span>`;
+          return esc;
+        }).join('');
+
+        diffOut.innerHTML = parts || '(no visible differences)';
+        return;
+      }
+
+      // Otherwise show hash comparison
+      diffType.textContent = 'Binary/hash diff';
+      diffOut.textContent =
+        `Binary or non-text content detected.\n\n` +
+        `ZIP A: size=${a.size} bytes, hash=${a.hash}\n` +
+        `ZIP B: size=${b.size} bytes, hash=${b.hash}\n`;
+    }
+
+    compareBtn.addEventListener('click', async () => {
+      clearUI();
+      setStatus('Loading ZIPs…', 'warn');
+      compareBtn.disabled = true;
+
+      try {
+        [mapA, mapB] = await Promise.all([
+          loadZipToMap(zipAFile),
+          loadZipToMap(zipBFile)
+        ]);
+
+        const pathsA = new Set(mapA.keys());
+        const pathsB = new Set(mapB.keys());
+
+        const added = [...pathsB].filter(p => !pathsA.has(p)).sort();
+        const removed = [...pathsA].filter(p => !pathsB.has(p)).sort();
+
+        const common = [...pathsA].filter(p => pathsB.has(p));
+        const changed = common.filter(p => {
+          const a = mapA.get(p), b = mapB.get(p);
+          // compare hashes (works for both text and binary)
+          return a.hash !== b.hash || a.size !== b.size;
+        }).sort();
+
+        countAdded.textContent = `Added: ${added.length}`;
+        countRemoved.textContent = `Removed: ${removed.length}`;
+        countChanged.textContent = `Changed: ${changed.length}`;
+
+        renderPathList(addedList, added, 'good');
+        renderPathList(removedList, removed, 'bad');
+        renderChangedList(changed);
+
+        if (changed.length === 0 && added.length === 0 && removed.length === 0) {
+          setStatus('No differences found ✅', 'good');
+        } else {
+          setStatus('Comparison complete', 'good');
+        }
+      } catch (err) {
+        console.error(err);
+        setStatus('Error parsing ZIP(s)', 'bad');
+        diffOut.textContent = String(err?.message || err);
+      } finally {
+        compareBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
