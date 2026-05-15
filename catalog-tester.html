@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Catalog Service Tester</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 20px;
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #1f2937; background: #f8fafc;
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  h2 { font-size: 14px; margin: 0 0 8px; color: #334155; }
+  .sub { color: #64748b; font-size: 12px; margin-bottom: 16px; }
+  .panel {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 14px 16px; margin-bottom: 14px;
+  }
+  .panel h2 { display: flex; align-items: center; gap: 6px; }
+  .panel .badge {
+    background: #eef2ff; color: #4338ca; font-size: 10px;
+    padding: 2px 6px; border-radius: 4px; font-weight: 600;
+    letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  .row { display: grid; grid-template-columns: 140px 1fr; gap: 8px; margin-bottom: 8px; align-items: center; }
+  .row label { color: #475569; font-size: 12px; }
+  input[type=text], input[type=password] {
+    width: 100%; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 4px;
+    font: inherit; font-size: 13px; background: #fff;
+  }
+  input:focus { outline: 2px solid #6366f1; outline-offset: -1px; border-color: #6366f1; }
+  button {
+    background: #4f46e5; color: #fff; border: none; padding: 8px 16px;
+    border-radius: 6px; font: inherit; font-size: 13px; font-weight: 500;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { background: #4338ca; }
+  button:disabled { background: #cbd5e1; cursor: not-allowed; }
+  button.secondary { background: #fff; color: #475569; border: 1px solid #cbd5e1; }
+  button.secondary:hover:not(:disabled) { background: #f1f5f9; }
+  .actions { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+  .status {
+    font-size: 12px; padding: 2px 8px; border-radius: 4px; font-weight: 500;
+  }
+  .status.idle { background: #f1f5f9; color: #64748b; }
+  .status.running { background: #fef3c7; color: #92400e; }
+  .status.ok { background: #d1fae5; color: #065f46; }
+  .status.error { background: #fee2e2; color: #991b1b; }
+  .output {
+    margin-top: 10px; padding: 10px 12px;
+    background: #0f172a; color: #e2e8f0;
+    border-radius: 6px; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+    white-space: pre-wrap; word-break: break-all; max-height: 320px; overflow: auto;
+  }
+  .output:empty { display: none; }
+  .token-display {
+    font: 12px ui-monospace, monospace; color: #475569;
+    padding: 6px 8px; background: #f1f5f9; border-radius: 4px;
+    word-break: break-all;
+  }
+  .hint { font-size: 11px; color: #64748b; margin-top: 4px; }
+  details summary { cursor: pointer; user-select: none; font-weight: 600; color: #334155; }
+  details[open] summary { margin-bottom: 10px; }
+  .file-row {
+    display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;
+    margin-bottom: 6px;
+  }
+  .file-row input[type=file] { font-size: 12px; }
+  .file-meta {
+    font: 11px ui-monospace, monospace; color: #475569;
+    margin-left: auto;
+  }
+  .console {
+    background: #0f172a; color: #e2e8f0;
+    border-radius: 6px; padding: 10px 12px;
+    font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+    max-height: 420px; overflow: auto;
+    white-space: pre-wrap; word-break: break-all;
+  }
+  .console:empty::before { content: 'No requests yet.'; color: #64748b; font-style: italic; }
+  .log-entry { margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #1e293b; }
+  .log-entry:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .log-meta { color: #94a3b8; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .log-meta .tag { background: #1e293b; padding: 1px 6px; border-radius: 3px; margin-right: 6px; color: #cbd5e1; }
+  .log-meta .tag.ok { background: #064e3b; color: #6ee7b7; }
+  .log-meta .tag.err { background: #7f1d1d; color: #fca5a5; }
+  .log-cmd { color: #cbd5e1; margin: 4px 0; }
+  .log-cmd::before { content: '$ '; color: #64748b; }
+  .log-resp { color: #e2e8f0; }
+  .log-resp.err { color: #fca5a5; }
+</style>
+</head>
+<body>
+
+<h1>Catalog Service Tester</h1>
+<p class="sub">Upload a CIF, XLSX, or BMEcat file, log in with your credentials, then Import or Parse. Calls run directly from your browser to the configured service URL.</p>
+
+<!-- ────────────────────────────────────────────────────────────────── -->
+<!-- Config -->
+<div class="panel">
+  <details id="cfg">
+    <summary>Configuration</summary>
+    <h2 style="margin-top:6px">Endpoints</h2>
+    <div class="row">
+      <label for="auth_url">Auth URL</label>
+      <input id="auth_url" type="text" value="https://api.dev.orolabs.ai/ua/auth/login" />
+    </div>
+    <div class="row">
+      <label for="catalog_url">Catalog import URL</label>
+      <input id="catalog_url" type="text" placeholder="https://your-service/process/catalog/import" />
+    </div>
+    <div class="row">
+      <label for="search_url">Search URL</label>
+      <input id="search_url" type="text" placeholder="https://your-service/process/catalog/search" />
+    </div>
+
+    <h2 style="margin-top:14px">Credentials</h2>
+    <div class="row">
+      <label for="user_name">Username</label>
+      <input id="user_name" type="text" placeholder="username or user ID" />
+    </div>
+    <div class="row">
+      <label for="password">Password</label>
+      <input id="password" type="password" placeholder="password" />
+    </div>
+    <div class="row">
+      <label for="tenant_id">Tenant ID</label>
+      <input id="tenant_id" type="text" placeholder="your_tenant" />
+    </div>
+
+    <h2 style="margin-top:14px">Import params</h2>
+    <div class="row">
+      <label for="supplier_id">supplierId</label>
+      <input id="supplier_id" type="text" placeholder="e.g. 006996961" />
+    </div>
+    <div class="row">
+      <label for="catalog_id">catalogId</label>
+      <input id="catalog_id" type="text" placeholder="e.g. officedepot-2026-04-28" />
+    </div>
+
+    <div class="actions">
+      <button class="secondary" id="save_cfg">Save config locally</button>
+      <button class="secondary" id="reset_cfg">Reset to defaults</button>
+    </div>
+  </details>
+</div>
+
+<!-- ────────────────────────────────────────────────────────────────── -->
+<!-- Step 1: Log In -->
+<div class="panel">
+  <h2><span class="badge">Step 1</span> Log In <span id="login_status" class="status idle">idle</span></h2>
+  <p class="sub" style="margin-bottom:8px">POSTs <code>{userName, password, tenantId}</code> to the auth URL. Or paste a token directly if you already have one.</p>
+  <div class="actions">
+    <button id="login_btn">Log In</button>
+    <button class="secondary" id="set_token_btn">Paste token manually…</button>
+    <button class="secondary" id="clear_token_btn">Clear</button>
+  </div>
+  <div id="token_paste_row" style="display:none; margin-top:10px;">
+    <textarea id="token_paste_input" rows="3" placeholder="Paste token here (no quotes, no 'Bearer ' prefix needed — both will be stripped)"
+              style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:4px; font:12px ui-monospace,monospace; resize:vertical;"></textarea>
+    <div class="actions" style="margin-top:6px;">
+      <button id="token_save_btn">Save token</button>
+      <button class="secondary" id="token_cancel_btn">Cancel</button>
+    </div>
+  </div>
+  <div id="token_display" class="token-display" style="margin-top:10px; display:none;"></div>
+  <div id="login_output" class="output"></div>
+</div>
+
+<!-- ────────────────────────────────────────────────────────────────── -->
+<!-- Step 2: Import -->
+<div class="panel">
+  <h2><span class="badge">Step 2</span> Import Catalog <span id="import_status" class="status idle">idle</span></h2>
+  <p class="sub" style="margin-bottom:8px">Pick a catalog file, then POST it as multipart to the configured URL. Import writes to the database; Parse returns items without persisting.</p>
+
+  <div class="file-row">
+    <input id="cif_picker" type="file" accept=".cif,.txt,.xml,.xlsx" />
+    <span id="file_meta" class="file-meta">no file selected</span>
+  </div>
+
+  <div class="row" style="grid-template-columns: 140px 1fr; margin-top: 8px;">
+    <label for="format">format</label>
+    <select id="format" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; font:inherit; font-size:13px; background:#fff;">
+      <option value="CIF" selected>CIF</option>
+      <option value="EXCEL">EXCEL</option>
+      <option value="BMECAT">BMECAT</option>
+    </select>
+  </div>
+
+  <div class="actions">
+    <button id="import_btn" disabled>Import (write to DB)</button>
+    <button class="secondary" id="parse_btn" disabled>Parse only (no persist)</button>
+  </div>
+  <div id="import_output" class="output"></div>
+</div>
+
+<!-- ────────────────────────────────────────────────────────────────── -->
+<!-- Step 3: Search -->
+<div class="panel">
+  <h2><span class="badge">Step 3</span> Search <span id="search_status" class="status idle">idle</span></h2>
+  <p class="sub" style="margin-bottom:8px">Free-text search across imported catalog items. Optionally filter by supplierId or catalogId.</p>
+  <div class="row" style="grid-template-columns: 140px 1fr;">
+    <label for="search_q">keyword</label>
+    <input id="search_q" type="text" placeholder='e.g. "letter size paper" or "BL1"' />
+  </div>
+  <div class="row" style="grid-template-columns: 140px 1fr;">
+    <label for="search_supplier">supplierId filter</label>
+    <input id="search_supplier" type="text" placeholder="optional" />
+  </div>
+  <div class="row" style="grid-template-columns: 140px 1fr;">
+    <label for="search_catalog">catalogId filter</label>
+    <input id="search_catalog" type="text" placeholder="optional" />
+  </div>
+  <div class="actions">
+    <button id="search_btn">Search</button>
+  </div>
+  <div id="search_output" class="output"></div>
+</div>
+
+<!-- ────────────────────────────────────────────────────────────────── -->
+<!-- Console / Request Log -->
+<div class="panel">
+  <h2 style="display:flex; align-items:center; justify-content:space-between;">
+    <span>Console / Request Log</span>
+    <span>
+      <button class="secondary" id="copy_console_btn" style="font-size:11px; padding:4px 10px;">Copy last as curl</button>
+      <button class="secondary" id="clear_console_btn" style="font-size:11px; padding:4px 10px;">Clear</button>
+    </span>
+  </h2>
+  <p class="sub" style="margin-bottom:8px">Every action logs the exact request and raw response. "Copy last as curl" lets you replay in a terminal.</p>
+  <div id="console_log" class="console"></div>
+</div>
+
+<script>
+const CFG_KEYS = ['auth_url','catalog_url','search_url','user_name','password','tenant_id','supplier_id','catalog_id'];
+const STORAGE_KEY = 'catalog-tester:v1';
+const DEFAULTS = Object.fromEntries(CFG_KEYS.map(k => [k, document.getElementById(k).value]));
+
+function loadCfg() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    for (const k of CFG_KEYS) {
+      if (saved[k] !== undefined) document.getElementById(k).value = saved[k];
+    }
+  } catch (e) { console.warn('cfg load failed', e); }
+}
+function saveCfg() {
+  const obj = Object.fromEntries(CFG_KEYS.map(k => [k, document.getElementById(k).value]));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+  flash(document.getElementById('save_cfg'), 'Saved');
+}
+function resetCfg() {
+  for (const k of CFG_KEYS) document.getElementById(k).value = DEFAULTS[k];
+  localStorage.removeItem(STORAGE_KEY);
+  flash(document.getElementById('reset_cfg'), 'Reset');
+}
+function flash(btn, label) {
+  const orig = btn.textContent; btn.textContent = label;
+  setTimeout(() => { btn.textContent = orig; }, 1000);
+}
+function cfg(k) { return document.getElementById(k).value; }
+
+loadCfg();
+document.getElementById('save_cfg').onclick = saveCfg;
+document.getElementById('reset_cfg').onclick = resetCfg;
+
+// File picker
+const cifPicker = document.getElementById('cif_picker');
+const fileMeta  = document.getElementById('file_meta');
+const importBtn = document.getElementById('import_btn');
+const parseBtn  = document.getElementById('parse_btn');
+
+function refreshFileMeta() {
+  if (cifPicker.files && cifPicker.files.length > 0) {
+    const f = cifPicker.files[0];
+    fileMeta.textContent = f.name + ' · ' + f.size.toLocaleString() + ' bytes';
+    importBtn.disabled = false;
+    parseBtn.disabled  = false;
+  } else {
+    fileMeta.textContent = 'no file selected';
+    importBtn.disabled = true;
+    parseBtn.disabled  = true;
+  }
+}
+cifPicker.addEventListener('change', refreshFileMeta);
+refreshFileMeta();
+
+// Token state
+let token = sessionStorage.getItem('catalog-tester:token') || '';
+renderToken();
+
+function setToken(t) {
+  token = t || '';
+  if (token) sessionStorage.setItem('catalog-tester:token', token);
+  else sessionStorage.removeItem('catalog-tester:token');
+  renderToken();
+}
+function renderToken() {
+  const el = document.getElementById('token_display');
+  if (!token) { el.style.display = 'none'; return; }
+  const shown = token.length > 32 ? token.slice(0, 16) + '…' + token.slice(-8) : token;
+  el.textContent = 'token: ' + shown;
+  el.style.display = 'block';
+}
+
+// Console / request log
+const consoleEl = document.getElementById('console_log');
+const logEntries = [];
+
+function appendLog(label, curlString) {
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  const ts = new Date().toLocaleTimeString();
+  entry.innerHTML =
+    '<div class="log-meta"><span class="tag">' + ts + '</span><span class="tag">' + label + '</span><span class="tag running" data-state>running…</span></div>' +
+    '<div class="log-cmd"></div>' +
+    '<div class="log-resp"></div>';
+  entry.querySelector('.log-cmd').textContent = curlString;
+  consoleEl.appendChild(entry);
+  consoleEl.scrollTop = consoleEl.scrollHeight;
+  logEntries.push({ label, curl: curlString, response: '', code: null });
+  return entry;
+}
+function finalizeLog(entry, text, code, isError) {
+  const stateTag = entry.querySelector('[data-state]');
+  if (isError) {
+    stateTag.className = 'tag err'; stateTag.textContent = 'fetch error';
+  } else if (code >= 200 && code < 300) {
+    stateTag.className = 'tag ok'; stateTag.textContent = 'HTTP ' + code;
+  } else {
+    stateTag.className = 'tag err'; stateTag.textContent = 'HTTP ' + code;
+  }
+  entry.querySelector('.log-resp').textContent = text;
+  if (isError) entry.querySelector('.log-resp').classList.add('err');
+  consoleEl.scrollTop = consoleEl.scrollHeight;
+  const last = logEntries[logEntries.length - 1];
+  if (last) { last.response = text; last.code = code; }
+}
+
+document.getElementById('clear_console_btn').onclick = () => {
+  consoleEl.innerHTML = ''; logEntries.length = 0;
+};
+document.getElementById('copy_console_btn').onclick = async () => {
+  if (!logEntries.length) return;
+  try {
+    await navigator.clipboard.writeText(logEntries[logEntries.length - 1].curl);
+    flash(document.getElementById('copy_console_btn'), 'Copied!');
+  } catch (e) { flash(document.getElementById('copy_console_btn'), 'Copy failed'); }
+};
+
+function setStatus(id, kind, text) {
+  const el = document.getElementById(id);
+  el.className = 'status ' + kind;
+  el.textContent = text;
+}
+function setOutput(id, content) { document.getElementById(id).textContent = content; }
+function shq(s) {
+  if (s === undefined || s === null) return "''";
+  return "'" + String(s).replace(/'/g, "'\\''") + "'";
+}
+function prettify(text) {
+  try { return JSON.stringify(JSON.parse(text), null, 2); } catch (e) { return text; }
+}
+
+async function fetchJson(label, url, method, jsonBody, extraHeaders) {
+  const headers = Object.assign({ 'Accept': 'application/json', 'Content-Type': 'application/json' }, extraHeaders || {});
+  let curl = `curl -sS -X ${method} ${shq(url)} `;
+  for (const [k, v] of Object.entries(headers)) curl += `\\\n  -H ${shq(k + ': ' + v)} `;
+  if (jsonBody) curl += `\\\n  -d ${shq(JSON.stringify(jsonBody))}`;
+  const entry = appendLog(label, curl);
+  try {
+    const resp = await fetch(url, { method, headers, body: jsonBody ? JSON.stringify(jsonBody) : undefined });
+    const text = await resp.text();
+    finalizeLog(entry, prettify(text), resp.status, false);
+    return { ok: resp.ok, status: resp.status, text };
+  } catch (e) {
+    finalizeLog(entry, 'Network/CORS error: ' + (e && e.message || e), null, true);
+    return { ok: false, status: null, text: String(e) };
+  }
+}
+
+async function fetchMultipart(label, url, fileBlob, fileName, formParams, extraHeaders) {
+  const fd = new FormData();
+  fd.append('file', fileBlob, fileName);
+  for (const [k, v] of Object.entries(formParams)) fd.append(k, v);
+  const headers = Object.assign({}, extraHeaders || {});
+  let curl = `curl -sS -X POST ${shq(url)}`;
+  for (const [k, v] of Object.entries(headers)) curl += ` \\\n  -H ${shq(k + ': ' + v)}`;
+  curl += ` \\\n  -F ${shq('file=@' + fileName)}`;
+  for (const [k, v] of Object.entries(formParams)) curl += ` \\\n  -F ${shq(k + '=' + v)}`;
+  const entry = appendLog(label, curl);
+  try {
+    const resp = await fetch(url, { method: 'POST', headers, body: fd });
+    const text = await resp.text();
+    finalizeLog(entry, prettify(text), resp.status, false);
+    return { ok: resp.ok, status: resp.status, text };
+  } catch (e) {
+    finalizeLog(entry, 'Network/CORS error: ' + (e && e.message || e), null, true);
+    return { ok: false, status: null, text: String(e) };
+  }
+}
+
+// Login
+document.getElementById('login_btn').onclick = async () => {
+  setStatus('login_status', 'running', 'calling auth…');
+  setOutput('login_output', '');
+  const r = await fetchJson('login', cfg('auth_url'), 'POST', {
+    userName: cfg('user_name'), password: cfg('password'), tenantId: cfg('tenant_id'),
+  });
+  setOutput('login_output', r.text);
+  if (!r.ok) { setStatus('login_status', 'error', r.status ? `HTTP ${r.status}` : 'fetch error'); return; }
+  let parsed = null;
+  try { parsed = JSON.parse(r.text); } catch (e) {}
+  const found = parsed && (parsed.token || parsed.access_token || parsed.jwt || parsed.id_token);
+  if (found) {
+    setToken(found);
+    setStatus('login_status', 'ok', `HTTP ${r.status} · token captured`);
+  } else {
+    setStatus('login_status', 'error', 'no token field in response');
+  }
+};
+document.getElementById('set_token_btn').onclick = () => {
+  document.getElementById('token_paste_row').style.display = 'block';
+  document.getElementById('token_paste_input').value = '';
+  document.getElementById('token_paste_input').focus();
+};
+document.getElementById('token_save_btn').onclick = () => {
+  const raw = document.getElementById('token_paste_input').value.trim();
+  const cleaned = raw.replace(/^["']|["']$/g, '').replace(/^Bearer\s+/i, '').trim();
+  if (cleaned) {
+    setToken(cleaned);
+    setStatus('login_status', 'ok', 'token set manually');
+    document.getElementById('token_paste_row').style.display = 'none';
+  } else {
+    setStatus('login_status', 'error', 'empty token');
+  }
+};
+document.getElementById('token_cancel_btn').onclick = () => {
+  document.getElementById('token_paste_row').style.display = 'none';
+};
+document.getElementById('clear_token_btn').onclick = () => {
+  setToken(''); setStatus('login_status', 'idle', 'idle');
+};
+
+// Import / parse
+async function doImport(endpointSuffix, statusLabel, label) {
+  if (!cifPicker.files || cifPicker.files.length === 0) { setStatus('import_status', 'error', 'pick a file first'); return; }
+  if (!token) { setStatus('import_status', 'error', 'log in first or paste a token'); return; }
+  setStatus('import_status', 'running', statusLabel + '…');
+  setOutput('import_output', '');
+  const url = cfg('catalog_url').replace(/\/import$/, '') + endpointSuffix;
+  const file = cifPicker.files[0];
+  const r = await fetchMultipart(label, url, file, file.name, {
+    format: document.getElementById('format').value,
+    supplierId: cfg('supplier_id'),
+    catalogId: cfg('catalog_id'),
+  }, { 'Authorization': 'Bearer ' + token });
+  setOutput('import_output', r.text);
+  if (r.ok) setStatus('import_status', 'ok', `HTTP ${r.status}`);
+  else if (r.status) setStatus('import_status', 'error', `HTTP ${r.status}`);
+  else setStatus('import_status', 'error', 'fetch error');
+}
+document.getElementById('import_btn').onclick = () => doImport('/import', 'uploading file', 'import');
+document.getElementById('parse_btn').onclick  = () => doImport('/parse',  'parsing file (no persist)', 'parse');
+
+// Search
+document.getElementById('search_btn').onclick = async () => {
+  if (!token) { setStatus('search_status', 'error', 'log in first or paste a token'); return; }
+  setStatus('search_status', 'running', 'searching…');
+  setOutput('search_output', '');
+  const body = {
+    keyword:    document.getElementById('search_q').value || undefined,
+    supplierId: document.getElementById('search_supplier').value || undefined,
+    catalogId:  document.getElementById('search_catalog').value || undefined,
+    size: 20,
+  };
+  const r = await fetchJson('search', cfg('search_url'), 'POST', body, { 'Authorization': 'Bearer ' + token });
+  setOutput('search_output', r.text);
+  if (r.ok) setStatus('search_status', 'ok', `HTTP ${r.status}`);
+  else if (r.status) setStatus('search_status', 'error', `HTTP ${r.status}`);
+  else setStatus('search_status', 'error', 'fetch error');
+};
+</script>
+</body>
+</html>
