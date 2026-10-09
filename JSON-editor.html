@@ -3,150 +3,1942 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Dual JSON Editor & Diff Tool</title>
 
-    <!-- Secure absolute CDN links with explicit file extensions -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jsoneditor/10.4.3/jsoneditor.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsoneditor/10.4.3/jsoneditor.min.js"></script>
+    <!-- JSONEditor -->
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/jsoneditor/10.4.3/jsoneditor.min.css"
+    >
+
+    <script
+        src="https://cdnjs.cloudflare.com/ajax/libs/jsoneditor/10.4.3/jsoneditor.min.js">
+    </script>
+
+    <!-- JMESPath -->
+    <script
+        src="https://cdn.jsdelivr.net/npm/jmespath@0.16.0/jmespath.min.js">
+    </script>
 
     <style>
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            padding: 20px; 
-            background: #f4f4f9; 
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
             margin: 0;
         }
-        h2 { margin-bottom: 10px; color: #333; }
-        
-        /* Controls layout */
-        .controls {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-            background: #fff;
-            padding: 10px;
-            border-radius: 4px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        button {
-            background: #388e3c;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            font-size: 14px;
-            font-weight: bold;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        button:hover { background: #2e7d32; }
-        button.secondary { background: #0288d1; }
-        button.secondary:hover { background: #01579b; }
 
-        /* Workspace Grid Split */
-        .editor-container {
-            display: flex;
-            gap: 20px;
-            width: 100%;
-            height: calc(100vh - 140px);
-            min-height: 500px;
+        body {
+            font-family:
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                Roboto,
+                Helvetica,
+                Arial,
+                sans-serif;
+
+            background: #f4f4f7;
+            color: #333;
+            overflow: hidden;
         }
+
+
+        /* =========================================================
+           HEADER
+        ========================================================= */
+
+        .page-header {
+            height: 58px;
+            display: flex;
+            align-items: center;
+            padding: 0 14px;
+
+            background: #f4f4f7;
+        }
+
+        .page-header h2 {
+            margin: 0;
+            font-size: 23px;
+            font-weight: 700;
+        }
+
+
+        /* =========================================================
+           MAIN WORKSPACE
+        ========================================================= */
+
+        .workspace {
+            display: grid;
+
+            grid-template-columns:
+                minmax(0, 1fr)
+                118px
+                minmax(0, 1fr);
+
+            gap: 12px;
+
+            height: calc(100vh - 58px);
+            padding: 0 12px 12px 12px;
+        }
+
         .panel {
-            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            min-height: 0;
+        }
+
+        .panel-title {
+            flex: 0 0 auto;
+
+            margin-bottom: 6px;
+
+            color: #555;
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .editor-box {
+            flex: 1 1 auto;
+            min-height: 0;
+
+            background: white;
+        }
+
+        .editor-box > .jsoneditor {
+            height: 100%;
+        }
+
+
+        /* =========================================================
+           CENTER CONTROLS
+        ========================================================= */
+
+        .center-toolbar {
+            display: flex;
+            flex-direction: column;
+
+            align-items: center;
+            justify-content: center;
+
+            gap: 29px;
+
+            padding-top: 20px;
+        }
+
+        .tool-group {
+            width: 100%;
+            text-align: center;
+        }
+
+        .tool-label {
+            margin-bottom: 7px;
+
+            font-size: 14px;
+            color: #555;
+        }
+
+        .button-row {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .square-button {
+            width: 48px;
+            height: 40px;
+
+            border: 1px solid #c9c9c9;
+            border-radius: 4px;
+
+            background: #e5e5e5;
+            color: #555;
+
+            padding: 0;
+
+            font-size: 25px;
+            line-height: 38px;
+            font-weight: normal;
+
+            cursor: pointer;
+        }
+
+        .square-button:hover {
+            background: #d5d5d5;
+        }
+
+        .square-button:active {
+            background: #c8c8c8;
+        }
+
+        .compare-button {
+            width: 102px;
+            height: 39px;
+
+            border: 1px solid #c9c9c9;
+            border-radius: 4px;
+
+            background: #e5e5e5;
+            color: #555;
+
+            font-size: 14px;
+
+            cursor: pointer;
+        }
+
+        .compare-button:hover {
+            background: #d5d5d5;
+        }
+
+        .difference-count {
+            margin-top: 9px;
+
+            font-size: 13px;
+            color: #666;
+        }
+
+        .difference-path {
+            margin-top: 7px;
+            padding: 5px 4px;
+
+            min-height: 26px;
+
+            font-family: Menlo, Monaco, Consolas, monospace;
+            font-size: 11px;
+
+            line-height: 16px;
+            word-break: break-word;
+
+            color: #555;
+        }
+
+        .difference-nav {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+
+            margin-top: 7px;
+        }
+
+        .difference-nav button {
+            width: 48px;
+            height: 35px;
+
+            border: 1px solid #c9c9c9;
+            border-radius: 4px;
+
+            background: #e5e5e5;
+            color: #555;
+
+            font-size: 20px;
+
+            cursor: pointer;
+        }
+
+        .difference-nav button:hover:not(:disabled) {
+            background: #d5d5d5;
+        }
+
+        .difference-nav button:disabled {
+            opacity: 0.4;
+            cursor: default;
+        }
+
+
+        /* =========================================================
+           TRANSFORM MODAL
+        ========================================================= */
+
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+
+            z-index: 1000;
+
+            display: none;
+
+            background: rgba(0, 0, 0, 0.28);
+        }
+
+        .modal-backdrop.visible {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .transform-window {
+            width: min(1180px, calc(100vw - 28px));
+            height: min(790px, calc(100vh - 28px));
+
+            display: flex;
+            flex-direction: column;
+
+            background: #f4f4f4;
+
+            border: 1px solid #888;
+
+            box-shadow:
+                0 12px 40px rgba(0, 0, 0, 0.25);
+        }
+
+
+        /* Transform title bar */
+
+        .transform-titlebar {
+            height: 34px;
+
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            flex: 0 0 auto;
+
+            padding: 0 8px;
+
+            background: #90b873;
+            color: white;
+        }
+
+        .transform-title {
+            font-size: 16px;
+        }
+
+        .transform-window-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .transform-close {
+            border: 0;
+            background: transparent;
+            color: white;
+
+            font-size: 26px;
+            line-height: 26px;
+
+            cursor: pointer;
+        }
+
+
+        /* Transform body */
+
+        .transform-content {
+            flex: 1 1 auto;
+            min-height: 0;
+
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+
+            padding: 16px;
+        }
+
+        .transform-left,
+        .transform-right {
+            min-width: 0;
+            min-height: 0;
+        }
+
+        .transform-left {
             display: flex;
             flex-direction: column;
         }
-        .panel-title {
-            font-weight: bold;
-            margin-bottom: 5px;
+
+        .transform-help-title,
+        .transform-section-title {
+            font-size: 16px;
+            font-weight: 700;
+
             color: #555;
         }
-        .editor-box {
-            flex: 1;
+
+        .transform-description {
+            margin-top: 4px;
+
+            font-size: 15px;
+            line-height: 22px;
+
+            color: #555;
+        }
+
+        .transform-description code {
+            padding: 1px 5px;
+
+            background: #e6e6e6;
+
+            font-family: Menlo, Monaco, Consolas, monospace;
+            font-size: 13px;
+        }
+
+        .transform-description a {
+            color: #1475c9;
+        }
+
+        .field-label {
+            margin-top: 20px;
+            margin-bottom: 5px;
+
+            font-size: 15px;
+            font-weight: 700;
+
+            color: #555;
+        }
+
+        .path-display {
+            height: 31px;
+
+            padding: 5px 7px;
+
+            border: 1px solid #d0d5da;
+
+            background: #fafafa;
+
+            font-family: Menlo, Monaco, Consolas, monospace;
+            font-size: 13px;
+
+            color: #555;
+        }
+
+        .query-area {
+            flex: 1 1 auto;
+
+            min-height: 180px;
+
+            width: 100%;
+
+            resize: none;
+
+            border: 1px solid #91ba70;
+            outline: none;
+
+            padding: 8px;
+
+            background: white;
+
+            font-family: Menlo, Monaco, Consolas, monospace;
+            font-size: 14px;
+            line-height: 20px;
+        }
+
+        .query-area:focus {
+            border-color: #74a753;
+
+            box-shadow:
+                inset 0 0 0 1px #74a753;
+        }
+
+        .query-error {
+            min-height: 22px;
+
+            margin-top: 5px;
+
+            font-size: 12px;
+            color: #b3261e;
+        }
+
+
+        /* Original/preview editors */
+
+        .transform-right {
+            display: grid;
+
+            grid-template-rows:
+                auto
+                minmax(0, 1fr)
+                auto
+                minmax(0, 1fr);
+
+            gap: 7px;
+        }
+
+        .transform-preview-editor {
+            min-height: 0;
+        }
+
+        .transform-preview-editor > .jsoneditor {
             height: 100%;
+        }
+
+
+        /* Footer */
+
+        .transform-footer {
+            height: 60px;
+
+            flex: 0 0 auto;
+
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+
+            padding: 0 14px;
+
+            border-top: 1px solid #ddd;
+        }
+
+        .apply-transform {
+            min-width: 113px;
+
+            padding: 10px 18px;
+
+            border: none;
+            border-radius: 3px;
+
+            background: #7ea260;
+            color: white;
+
+            font-size: 15px;
+
+            cursor: pointer;
+        }
+
+        .apply-transform:hover {
+            background: #709455;
+        }
+
+        .apply-transform:disabled {
+            opacity: 0.45;
+            cursor: default;
+        }
+
+
+        /* =========================================================
+           SMALLER SCREENS
+        ========================================================= */
+
+        @media (max-width: 900px) {
+
+            body {
+                overflow: auto;
+            }
+
+            .workspace {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+
+            .panel {
+                height: 520px;
+            }
+
+            .center-toolbar {
+                flex-direction: row;
+                padding: 12px 0;
+            }
+
+            .transform-content {
+                grid-template-columns: 1fr;
+                overflow: auto;
+            }
+
+            .transform-left,
+            .transform-right {
+                min-height: 500px;
+            }
         }
     </style>
 </head>
+
 <body>
 
-    <h2>Dual JSON Editor & Sync Tool</h2>
-    
-    <!-- Workspace Actions bar -->
-    <div class="controls">
-        <button class="secondary" id="copyLeftToRight">Copy Left ➔ Right</button>
-        <button class="secondary" id="copyRightToLeft">Copy Right ➔ Left</button>
-        <button id="compareJson">Quick Compare</button>
+    <header class="page-header">
+        <h2>Dual JSON Editor &amp; Sync Tool</h2>
+    </header>
+
+
+    <!-- =========================================================
+         MAIN EDITORS
+    ========================================================= -->
+
+    <main class="workspace">
+
+        <!-- LEFT -->
+
+        <section class="panel">
+
+            <div class="panel-title">
+                Left JSON (Source / Original)
+            </div>
+
+            <div
+                id="jsoneditor-left"
+                class="editor-box">
+            </div>
+
+        </section>
+
+
+        <!-- CENTER -->
+
+        <aside class="center-toolbar">
+
+            <!-- COPY -->
+
+            <div class="tool-group">
+
+                <div class="tool-label">
+                    Copy
+                </div>
+
+                <div class="button-row">
+
+                    <button
+                        id="copyRightToLeft"
+                        class="square-button"
+                        type="button"
+                        title="Copy right JSON to left">
+                        ←
+                    </button>
+
+                    <button
+                        id="copyLeftToRight"
+                        class="square-button"
+                        type="button"
+                        title="Copy left JSON to right">
+                        →
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <!-- TRANSFORM -->
+
+            <div class="tool-group">
+
+                <div class="tool-label">
+                    Transform
+                </div>
+
+                <div class="button-row">
+
+                    <button
+                        id="transformRightToLeft"
+                        class="square-button"
+                        type="button"
+                        title="Transform right JSON into left">
+                        ←
+                    </button>
+
+                    <button
+                        id="transformLeftToRight"
+                        class="square-button"
+                        type="button"
+                        title="Transform left JSON into right">
+                        →
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <!-- DIFFERENCES -->
+
+            <div class="tool-group">
+
+                <div class="tool-label">
+                    Differences
+                </div>
+
+                <button
+                    id="compareJson"
+                    class="compare-button"
+                    type="button">
+                    ✓ Compare
+                </button>
+
+                <div
+                    id="differenceCount"
+                    class="difference-count">
+                    Not compared
+                </div>
+
+                <div
+                    id="differencePath"
+                    class="difference-path">
+                </div>
+
+                <div class="difference-nav">
+
+                    <button
+                        id="previousDifference"
+                        type="button"
+                        disabled
+                        title="Previous difference">
+                        ↑
+                    </button>
+
+                    <button
+                        id="nextDifference"
+                        type="button"
+                        disabled
+                        title="Next difference">
+                        ↓
+                    </button>
+
+                </div>
+
+            </div>
+
+        </aside>
+
+
+        <!-- RIGHT -->
+
+        <section class="panel">
+
+            <div class="panel-title">
+                Right JSON (Target / Transformed)
+            </div>
+
+            <div
+                id="jsoneditor-right"
+                class="editor-box">
+            </div>
+
+        </section>
+
+    </main>
+
+
+    <!-- =========================================================
+         TRANSFORM WINDOW
+    ========================================================= -->
+
+    <div
+        id="transformBackdrop"
+        class="modal-backdrop">
+
+        <div
+            class="transform-window"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="transformTitle">
+
+            <div class="transform-titlebar">
+
+                <div
+                    id="transformTitle"
+                    class="transform-title">
+                    Transform
+                </div>
+
+                <div class="transform-window-actions">
+
+                    <button
+                        id="closeTransform"
+                        class="transform-close"
+                        type="button"
+                        title="Close">
+                        ×
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <div class="transform-content">
+
+                <!-- QUERY SIDE -->
+
+                <div class="transform-left">
+
+                    <div class="transform-help-title">
+                        Language
+                    </div>
+
+                    <div class="transform-description">
+                        Enter a
+                        <a
+                            href="https://jmespath.org/"
+                            target="_blank"
+                            rel="noopener noreferrer">
+                            JMESPath query
+                        </a>
+                        to filter, project, sort, or transform the JSON.
+                        Leave the query blank to return the full document.
+                    </div>
+
+                    <div class="transform-description">
+                        Examples:
+                        <code>people[?age &gt; `18`]</code>,
+                        <code>sort_by(items, &amp;price)</code>,
+                        <code>users[].name</code>
+                    </div>
+
+
+                    <div class="field-label">
+                        Path
+                    </div>
+
+                    <div class="path-display">
+                        (document root)
+                    </div>
+
+
+                    <label
+                        class="field-label"
+                        for="transformQuery">
+                        Query
+                    </label>
+
+                    <textarea
+                        id="transformQuery"
+                        class="query-area"
+                        spellcheck="false"
+                        placeholder="Enter a JMESPath expression..."></textarea>
+
+                    <div
+                        id="queryError"
+                        class="query-error">
+                    </div>
+
+                </div>
+
+
+                <!-- ORIGINAL / PREVIEW SIDE -->
+
+                <div class="transform-right">
+
+                    <div class="transform-section-title">
+                        Original
+                    </div>
+
+                    <div
+                        id="transformOriginal"
+                        class="transform-preview-editor">
+                    </div>
+
+
+                    <div class="transform-section-title">
+                        Preview
+                    </div>
+
+                    <div
+                        id="transformPreview"
+                        class="transform-preview-editor">
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="transform-footer">
+
+                <button
+                    id="applyTransform"
+                    class="apply-transform"
+                    type="button">
+                    Transform
+                </button>
+
+            </div>
+
+        </div>
+
     </div>
 
-    <!-- Dual Workspace Framework -->
-    <div class="editor-container">
-        <!-- Left Window Container -->
-        <div class="panel">
-            <div class="panel-title">Left JSON (Source / Original)</div>
-            <div id="jsoneditor-left" class="editor-box"></div>
-        </div>
-        
-        <!-- Right Window Container -->
-        <div class="panel">
-            <div class="panel-title">Right JSON (Target / Transformed)</div>
-            <div id="jsoneditor-right" class="editor-box"></div>
-        </div>
-    </div>
 
     <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            // Configuration rules for both independent objects
-            const options = {
-                mode: 'tree',
-                modes: ['tree', 'code', 'text', 'preview']
-            };
-            
-            // Build and target left and right nodes
-            const editorLeft = new JSONEditor(document.getElementById("jsoneditor-left"), options);
-            const editorRight = new JSONEditor(document.getElementById("jsoneditor-right"), options);
+        document.addEventListener(
+            "DOMContentLoaded",
+            function () {
 
-            // Populate sample data
-            editorLeft.set({ "id": 101, "name": "Package A", "files": ["data.zip", "archive.rar"] });
-            editorRight.set({ "id": 101, "name": "Package B", "files": ["data.zip", "backup.tar.gz"] });
+                /* =================================================
+                   MAIN EDITORS
+                ================================================= */
 
-            // Button Action: Send Left data to Right block
-            document.getElementById("copyLeftToRight").addEventListener("click", function() {
-                try {
-                    const data = editorLeft.get();
-                    editorRight.set(data);
-                } catch (e) {
-                    alert("Cannot copy: Left JSON code is structurally invalid.");
-                }
-            });
+                const editorOptions = {
+                    mode: "tree",
 
-            // Button Action: Send Right data to Left block
-            document.getElementById("copyRightToLeft").addEventListener("click", function() {
-                try {
-                    const data = editorRight.get();
-                    editorLeft.set(data);
-                } catch (e) {
-                    alert("Cannot copy: Right JSON code is structurally invalid.");
-                }
-            });
+                    modes: [
+                        "tree",
+                        "code",
+                        "text",
+                        "preview"
+                    ],
 
-            // Button Action: Run quick structural comparison
-            document.getElementById("compareJson").addEventListener("click", function() {
-                try {
-                    const strLeft = JSON.stringify(editorLeft.get());
-                    const strRight = JSON.stringify(editorRight.get());
-                    
-                    if (strLeft === strRight) {
-                        alert("🎉 Both JSON windows match perfectly!");
-                    } else {
-                        alert("⚠️ Differences detected! Open your browser DevTools Console (F12) to see details.");
-                        console.log("Left View Content:", editorLeft.get());
-                        console.log("Right View Content:", editorRight.get());
+                    mainMenuBar: true,
+                    navigationBar: true,
+                    statusBar: true
+                };
+
+
+                const editorLeft = new JSONEditor(
+                    document.getElementById("jsoneditor-left"),
+                    editorOptions
+                );
+
+                const editorRight = new JSONEditor(
+                    document.getElementById("jsoneditor-right"),
+                    editorOptions
+                );
+
+
+                /* =================================================
+                   SAMPLE DATA
+                ================================================= */
+
+                editorLeft.set({
+                    id: 101,
+                    name: "Package A",
+                    files: [
+                        "data.zip",
+                        "archive.rar"
+                    ]
+                });
+
+                editorRight.set({
+                    id: 101,
+                    name: "Package B",
+                    files: [
+                        "data.zip",
+                        "backup.tar.gz"
+                    ]
+                });
+
+
+                /* =================================================
+                   TRANSFORM PREVIEW EDITORS
+                ================================================= */
+
+                const previewOptions = {
+                    mode: "tree",
+                    modes: ["tree"],
+                    mainMenuBar: false,
+                    navigationBar: false,
+                    statusBar: false,
+                    onEditable: function () {
+                        return false;
                     }
-                } catch (e) {
-                    alert("Please verify both input boxes are error-free before executing comparison.");
+                };
+
+
+                const transformOriginal =
+                    new JSONEditor(
+                        document.getElementById(
+                            "transformOriginal"
+                        ),
+                        previewOptions
+                    );
+
+
+                const transformPreview =
+                    new JSONEditor(
+                        document.getElementById(
+                            "transformPreview"
+                        ),
+                        previewOptions
+                    );
+
+
+                /* =================================================
+                   HELPERS
+                ================================================= */
+
+                function cloneJson(value) {
+
+                    return JSON.parse(
+                        JSON.stringify(value)
+                    );
+
                 }
-            });
-        });
+
+
+                function resetComparison() {
+
+                    differences = [];
+                    currentDifferenceIndex = -1;
+
+                    document
+                        .getElementById("differenceCount")
+                        .textContent =
+                        "Not compared";
+
+                    document
+                        .getElementById("differencePath")
+                        .textContent =
+                        "";
+
+                    document
+                        .getElementById(
+                            "previousDifference"
+                        )
+                        .disabled =
+                        true;
+
+                    document
+                        .getElementById(
+                            "nextDifference"
+                        )
+                        .disabled =
+                        true;
+                }
+
+
+                /* =================================================
+                   COPY
+                ================================================= */
+
+                document
+                    .getElementById("copyLeftToRight")
+                    .addEventListener(
+                        "click",
+                        function () {
+
+                            try {
+
+                                editorRight.set(
+                                    cloneJson(
+                                        editorLeft.get()
+                                    )
+                                );
+
+                                resetComparison();
+
+                            } catch (error) {
+
+                                alert(
+                                    "Cannot copy because the left JSON is invalid."
+                                );
+
+                            }
+
+                        }
+                    );
+
+
+                document
+                    .getElementById("copyRightToLeft")
+                    .addEventListener(
+                        "click",
+                        function () {
+
+                            try {
+
+                                editorLeft.set(
+                                    cloneJson(
+                                        editorRight.get()
+                                    )
+                                );
+
+                                resetComparison();
+
+                            } catch (error) {
+
+                                alert(
+                                    "Cannot copy because the right JSON is invalid."
+                                );
+
+                            }
+
+                        }
+                    );
+
+
+                /* =================================================
+                   TRANSFORM MODAL STATE
+                ================================================= */
+
+                let transformSourceEditor = null;
+                let transformTargetEditor = null;
+                let transformResult = null;
+
+
+                const transformBackdrop =
+                    document.getElementById(
+                        "transformBackdrop"
+                    );
+
+                const transformQuery =
+                    document.getElementById(
+                        "transformQuery"
+                    );
+
+                const queryError =
+                    document.getElementById(
+                        "queryError"
+                    );
+
+                const applyTransform =
+                    document.getElementById(
+                        "applyTransform"
+                    );
+
+
+                function openTransform(
+                    sourceEditor,
+                    targetEditor
+                ) {
+
+                    let source;
+
+                    try {
+
+                        source =
+                            cloneJson(
+                                sourceEditor.get()
+                            );
+
+                    } catch (error) {
+
+                        alert(
+                            "The source JSON is invalid."
+                        );
+
+                        return;
+                    }
+
+
+                    transformSourceEditor =
+                        sourceEditor;
+
+                    transformTargetEditor =
+                        targetEditor;
+
+
+                    transformOriginal.set(
+                        source
+                    );
+
+                    transformPreview.set(
+                        source
+                    );
+
+
+                    transformQuery.value =
+                        "";
+
+                    transformResult =
+                        source;
+
+                    queryError.textContent =
+                        "";
+
+                    applyTransform.disabled =
+                        false;
+
+
+                    transformBackdrop
+                        .classList
+                        .add("visible");
+
+
+                    /*
+                     * JSONEditor calculates its dimensions when
+                     * visible, so refresh after displaying modal.
+                     */
+                    setTimeout(
+                        function () {
+
+                            try {
+                                transformOriginal.refresh();
+                                transformPreview.refresh();
+                            } catch (error) {
+                                // refresh is cosmetic only
+                            }
+
+                            transformQuery.focus();
+
+                        },
+                        20
+                    );
+                }
+
+
+                function closeTransform() {
+
+                    transformBackdrop
+                        .classList
+                        .remove("visible");
+
+                    transformSourceEditor =
+                        null;
+
+                    transformTargetEditor =
+                        null;
+
+                    transformResult =
+                        null;
+                }
+
+
+                /* LEFT → RIGHT */
+
+                document
+                    .getElementById(
+                        "transformLeftToRight"
+                    )
+                    .addEventListener(
+                        "click",
+                        function () {
+
+                            openTransform(
+                                editorLeft,
+                                editorRight
+                            );
+
+                        }
+                    );
+
+
+                /* RIGHT → LEFT */
+
+                document
+                    .getElementById(
+                        "transformRightToLeft"
+                    )
+                    .addEventListener(
+                        "click",
+                        function () {
+
+                            openTransform(
+                                editorRight,
+                                editorLeft
+                            );
+
+                        }
+                    );
+
+
+                /* =================================================
+                   LIVE TRANSFORM PREVIEW
+                ================================================= */
+
+                function updateTransformPreview() {
+
+                    if (!transformSourceEditor) {
+                        return;
+                    }
+
+
+                    let source;
+
+                    try {
+
+                        source =
+                            transformSourceEditor.get();
+
+                    } catch (error) {
+
+                        queryError.textContent =
+                            "The source JSON is invalid.";
+
+                        applyTransform.disabled =
+                            true;
+
+                        return;
+                    }
+
+
+                    const expression =
+                        transformQuery
+                            .value
+                            .trim();
+
+
+                    /*
+                     * Blank query means identity transform.
+                     */
+
+                    if (expression === "") {
+
+                        transformResult =
+                            cloneJson(source);
+
+                        transformPreview.set(
+                            cloneJson(source)
+                        );
+
+                        queryError.textContent =
+                            "";
+
+                        applyTransform.disabled =
+                            false;
+
+                        return;
+                    }
+
+
+                    try {
+
+                        const result =
+                            jmespath.search(
+                                source,
+                                expression
+                            );
+
+
+                        /*
+                         * JSON values cannot be undefined.
+                         * JMESPath normally returns null when
+                         * nothing matches.
+                         */
+
+                        transformResult =
+                            result === undefined
+                                ? null
+                                : result;
+
+
+                        transformPreview.set(
+                            cloneJson(
+                                transformResult
+                            )
+                        );
+
+
+                        queryError.textContent =
+                            "";
+
+                        applyTransform.disabled =
+                            false;
+
+                    } catch (error) {
+
+                        transformResult =
+                            null;
+
+                        queryError.textContent =
+                            error.message ||
+                            "Invalid JMESPath query.";
+
+                        applyTransform.disabled =
+                            true;
+
+                    }
+
+                }
+
+
+                let queryTimer = null;
+
+
+                transformQuery.addEventListener(
+                    "input",
+                    function () {
+
+                        clearTimeout(
+                            queryTimer
+                        );
+
+                        queryTimer =
+                            setTimeout(
+                                updateTransformPreview,
+                                120
+                            );
+
+                    }
+                );
+
+
+                /* =================================================
+                   APPLY TRANSFORMATION
+                ================================================= */
+
+                applyTransform.addEventListener(
+                    "click",
+                    function () {
+
+                        if (
+                            !transformTargetEditor ||
+                            applyTransform.disabled
+                        ) {
+                            return;
+                        }
+
+
+                        try {
+
+                            transformTargetEditor.set(
+                                cloneJson(
+                                    transformResult
+                                )
+                            );
+
+                            resetComparison();
+
+                            closeTransform();
+
+                        } catch (error) {
+
+                            queryError.textContent =
+                                "Unable to apply transformation.";
+
+                            console.error(
+                                error
+                            );
+
+                        }
+
+                    }
+                );
+
+
+                /* =================================================
+                   CLOSE TRANSFORM
+                ================================================= */
+
+                document
+                    .getElementById(
+                        "closeTransform"
+                    )
+                    .addEventListener(
+                        "click",
+                        closeTransform
+                    );
+
+
+                transformBackdrop.addEventListener(
+                    "click",
+                    function (event) {
+
+                        if (
+                            event.target ===
+                            transformBackdrop
+                        ) {
+
+                            closeTransform();
+
+                        }
+
+                    }
+                );
+
+
+                document.addEventListener(
+                    "keydown",
+                    function (event) {
+
+                        if (
+                            event.key === "Escape" &&
+                            transformBackdrop
+                                .classList
+                                .contains("visible")
+                        ) {
+
+                            closeTransform();
+
+                        }
+
+                    }
+                );
+
+
+                /* =================================================
+                   DIFFERENCE ENGINE
+                ================================================= */
+
+                let differences = [];
+                let currentDifferenceIndex = -1;
+
+
+                function makePath(
+                    parent,
+                    key,
+                    isArrayIndex
+                ) {
+
+                    if (isArrayIndex) {
+
+                        return (
+                            parent +
+                            "[" +
+                            key +
+                            "]"
+                        );
+
+                    }
+
+
+                    const simpleKey =
+                        /^[A-Za-z_$][A-Za-z0-9_$]*$/
+                            .test(key);
+
+
+                    if (simpleKey) {
+
+                        return parent
+                            ? parent + "." + key
+                            : key;
+
+                    }
+
+
+                    return (
+                        parent +
+                        "[" +
+                        JSON.stringify(key) +
+                        "]"
+                    );
+                }
+
+
+                function findDifferences(
+                    left,
+                    right,
+                    path
+                ) {
+
+                    /*
+                     * Same primitive or same reference.
+                     */
+
+                    if (left === right) {
+                        return;
+                    }
+
+
+                    /*
+                     * Null mismatch.
+                     */
+
+                    if (
+                        left === null ||
+                        right === null
+                    ) {
+
+                        differences.push({
+                            path: path || "(root)",
+                            type: "changed",
+                            left: left,
+                            right: right
+                        });
+
+                        return;
+                    }
+
+
+                    /*
+                     * Different primitive values.
+                     */
+
+                    if (
+                        typeof left !== "object" ||
+                        typeof right !== "object"
+                    ) {
+
+                        differences.push({
+                            path: path || "(root)",
+                            type: "changed",
+                            left: left,
+                            right: right
+                        });
+
+                        return;
+                    }
+
+
+                    /*
+                     * Object vs array.
+                     */
+
+                    if (
+                        Array.isArray(left) !==
+                        Array.isArray(right)
+                    ) {
+
+                        differences.push({
+                            path: path || "(root)",
+                            type: "changed",
+                            left: left,
+                            right: right
+                        });
+
+                        return;
+                    }
+
+
+                    /*
+                     * Arrays.
+                     */
+
+                    if (Array.isArray(left)) {
+
+                        const maxLength =
+                            Math.max(
+                                left.length,
+                                right.length
+                            );
+
+
+                        for (
+                            let index = 0;
+                            index < maxLength;
+                            index++
+                        ) {
+
+                            const childPath =
+                                makePath(
+                                    path,
+                                    index,
+                                    true
+                                );
+
+
+                            if (
+                                index >=
+                                left.length
+                            ) {
+
+                                differences.push({
+                                    path: childPath,
+                                    type: "added",
+                                    left: undefined,
+                                    right:
+                                        right[index]
+                                });
+
+                            } else if (
+                                index >=
+                                right.length
+                            ) {
+
+                                differences.push({
+                                    path: childPath,
+                                    type: "removed",
+                                    left:
+                                        left[index],
+                                    right:
+                                        undefined
+                                });
+
+                            } else {
+
+                                findDifferences(
+                                    left[index],
+                                    right[index],
+                                    childPath
+                                );
+
+                            }
+
+                        }
+
+                        return;
+                    }
+
+
+                    /*
+                     * Objects.
+                     */
+
+                    const keys =
+                        new Set([
+                            ...Object.keys(left),
+                            ...Object.keys(right)
+                        ]);
+
+
+                    keys.forEach(
+                        function (key) {
+
+                            const childPath =
+                                makePath(
+                                    path,
+                                    key,
+                                    false
+                                );
+
+
+                            const leftHas =
+                                Object.prototype
+                                    .hasOwnProperty
+                                    .call(
+                                        left,
+                                        key
+                                    );
+
+
+                            const rightHas =
+                                Object.prototype
+                                    .hasOwnProperty
+                                    .call(
+                                        right,
+                                        key
+                                    );
+
+
+                            if (!leftHas) {
+
+                                differences.push({
+                                    path: childPath,
+                                    type: "added",
+                                    left: undefined,
+                                    right:
+                                        right[key]
+                                });
+
+                            } else if (!rightHas) {
+
+                                differences.push({
+                                    path: childPath,
+                                    type: "removed",
+                                    left:
+                                        left[key],
+                                    right:
+                                        undefined
+                                });
+
+                            } else {
+
+                                findDifferences(
+                                    left[key],
+                                    right[key],
+                                    childPath
+                                );
+
+                            }
+
+                        }
+                    );
+                }
+
+
+                /* =================================================
+                   DIFFERENCE DISPLAY
+                ================================================= */
+
+                function updateDifferenceDisplay() {
+
+                    const count =
+                        differences.length;
+
+                    const countElement =
+                        document.getElementById(
+                            "differenceCount"
+                        );
+
+                    const pathElement =
+                        document.getElementById(
+                            "differencePath"
+                        );
+
+                    const previousButton =
+                        document.getElementById(
+                            "previousDifference"
+                        );
+
+                    const nextButton =
+                        document.getElementById(
+                            "nextDifference"
+                        );
+
+
+                    if (count === 0) {
+
+                        countElement.textContent =
+                            "0 differences";
+
+                        pathElement.textContent =
+                            "JSON documents match";
+
+                        previousButton.disabled =
+                            true;
+
+                        nextButton.disabled =
+                            true;
+
+                        return;
+                    }
+
+
+                    countElement.textContent =
+                        count === 1
+                            ? "1 difference"
+                            : count +
+                              " differences";
+
+
+                    previousButton.disabled =
+                        false;
+
+                    nextButton.disabled =
+                        false;
+
+
+                    if (
+                        currentDifferenceIndex < 0
+                    ) {
+
+                        currentDifferenceIndex =
+                            0;
+
+                    }
+
+
+                    const difference =
+                        differences[
+                            currentDifferenceIndex
+                        ];
+
+
+                    pathElement.textContent =
+                        (
+                            currentDifferenceIndex +
+                            1
+                        ) +
+                        " / " +
+                        count +
+                        "  " +
+                        difference.type +
+                        "\n" +
+                        difference.path;
+                }
+
+
+                /* =================================================
+                   COMPARE
+                ================================================= */
+
+                document
+                    .getElementById(
+                        "compareJson"
+                    )
+                    .addEventListener(
+                        "click",
+                        function () {
+
+                            try {
+
+                                const left =
+                                    editorLeft.get();
+
+                                const right =
+                                    editorRight.get();
+
+
+                                differences = [];
+
+                                currentDifferenceIndex =
+                                    -1;
+
+
+                                findDifferences(
+                                    left,
+                                    right,
+                                    ""
+                                );
+
+
+                                updateDifferenceDisplay();
+
+                            } catch (error) {
+
+                                document
+                                    .getElementById(
+                                        "differenceCount"
+                                    )
+                                    .textContent =
+                                    "Invalid JSON";
+
+                                document
+                                    .getElementById(
+                                        "differencePath"
+                                    )
+                                    .textContent =
+                                    "";
+
+                            }
+
+                        }
+                    );
+
+
+                /* =================================================
+                   PREVIOUS DIFFERENCE
+                ================================================= */
+
+                document
+                    .getElementById(
+                        "previousDifference"
+                    )
+                    .addEventListener(
+                        "click",
+                        function () {
+
+                            if (
+                                differences.length ===
+                                0
+                            ) {
+                                return;
+                            }
+
+
+                            currentDifferenceIndex--;
+
+
+                            if (
+                                currentDifferenceIndex <
+                                0
+                            ) {
+
+                                currentDifferenceIndex =
+                                    differences.length -
+                                    1;
+
+                            }
+
+
+                            updateDifferenceDisplay();
+
+                        }
+                    );
+
+
+                /* =================================================
+                   NEXT DIFFERENCE
+                ================================================= */
+
+                document
+                    .getElementById(
+                        "nextDifference"
+                    )
+                    .addEventListener(
+                        "click",
+                        function () {
+
+                            if (
+                                differences.length ===
+                                0
+                            ) {
+                                return;
+                            }
+
+
+                            currentDifferenceIndex++;
+
+
+                            if (
+                                currentDifferenceIndex >=
+                                differences.length
+                            ) {
+
+                                currentDifferenceIndex =
+                                    0;
+
+                            }
+
+
+                            updateDifferenceDisplay();
+
+                        }
+                    );
+
+            }
+        );
     </script>
+
 </body>
 </html>
