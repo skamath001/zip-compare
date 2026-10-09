@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dual JSON Editor & Diff Tool</title>
 
-    <!-- Secure absolute CDN paths for styles and icons -->
-    <link href="https://unpkg.com" rel="stylesheet" type="text/css">
-    <script src="https://unpkg.com"></script>
+    <!-- Secure absolute CDN links with explicit file extensions -->
+    <link href="https://cloudflare.com" rel="stylesheet" type="text/css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsoneditor/10.4.3/jsoneditor.min.js"></script>
 
     <style>
         body { 
@@ -18,7 +18,7 @@
         }
         h2 { margin-bottom: 10px; color: #333; }
         
-        /* Layout for the control bar */
+        /* Controls layout */
         .controls {
             display: flex;
             gap: 10px;
@@ -43,7 +43,7 @@
         button.secondary { background: #0288d1; }
         button.secondary:hover { background: #01579b; }
 
-        /* Side-by-side flexbox workspace */
+        /* Workspace Grid Split */
         .editor-container {
             display: flex;
             gap: 20px;
@@ -71,22 +71,22 @@
 
     <h2>Dual JSON Editor & Sync Tool</h2>
     
-    <!-- Middle-ware Operations Toolbar -->
+    <!-- Workspace Actions bar -->
     <div class="controls">
         <button class="secondary" id="copyLeftToRight">Copy Left ➔ Right</button>
         <button class="secondary" id="copyRightToLeft">Copy Right ➔ Left</button>
-        <button id="compareJson">Quick Compare (Console)</button>
+        <button id="compareJson">Quick Compare</button>
     </div>
 
-    <!-- The Dual Workspace -->
+    <!-- Dual Workspace Framework -->
     <div class="editor-container">
-        <!-- Left Panel -->
+        <!-- Left Window Container -->
         <div class="panel">
             <div class="panel-title">Left JSON (Source / Original)</div>
             <div id="jsoneditor-left" class="editor-box"></div>
         </div>
         
-        <!-- Right Panel -->
+        <!-- Right Window Container -->
         <div class="panel">
             <div class="panel-title">Right JSON (Target / Transformed)</div>
             <div id="jsoneditor-right" class="editor-box"></div>
@@ -95,41 +95,41 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", function() {
-            // Configuration options for both panels
+            // Configuration rules for both independent objects
             const options = {
                 mode: 'tree',
                 modes: ['tree', 'code', 'text', 'preview']
             };
             
-            // Initialize both editor boxes independently
+            // Build and target left and right nodes
             const editorLeft = new JSONEditor(document.getElementById("jsoneditor-left"), options);
             const editorRight = new JSONEditor(document.getElementById("jsoneditor-right"), options);
 
-            // Seed initial sample data to test layout
-            editorLeft.set({ "id": 101, "name": "Package A", "items": ["zip", "rar"] });
-            editorRight.set({ "id": 101, "name": "Package B", "items": ["zip", "tar.gz"] });
+            // Populate sample data
+            editorLeft.set({ "id": 101, "name": "Package A", "files": ["data.zip", "archive.rar"] });
+            editorRight.set({ "id": 101, "name": "Package B", "files": ["data.zip", "backup.tar.gz"] });
 
-            // Action: Transform Left Data over to Right Editor
+            // Button Action: Send Left data to Right block
             document.getElementById("copyLeftToRight").addEventListener("click", function() {
                 try {
                     const data = editorLeft.get();
                     editorRight.set(data);
                 } catch (e) {
-                    alert("Cannot copy: Left JSON code is invalid.");
+                    alert("Cannot copy: Left JSON code is structurally invalid.");
                 }
             });
 
-            // Action: Transform Right Data back over to Left Editor
+            // Button Action: Send Right data to Left block
             document.getElementById("copyRightToLeft").addEventListener("click", function() {
                 try {
                     const data = editorRight.get();
                     editorLeft.set(data);
                 } catch (e) {
-                    alert("Cannot copy: Right JSON code is invalid.");
+                    alert("Cannot copy: Right JSON code is structurally invalid.");
                 }
             });
 
-            // Action: Basic structural comparison checker
+            // Button Action: Run quick structural comparison
             document.getElementById("compareJson").addEventListener("click", function() {
                 try {
                     const strLeft = JSON.stringify(editorLeft.get());
@@ -139,11 +139,11 @@
                         alert("🎉 Both JSON windows match perfectly!");
                     } else {
                         alert("⚠️ Differences detected! Open your browser DevTools Console (F12) to see details.");
-                        console.log("Left Payload:", editorLeft.get());
-                        console.log("Right Payload:", editorRight.get());
+                        console.log("Left View Content:", editorLeft.get());
+                        console.log("Right View Content:", editorRight.get());
                     }
                 } catch (e) {
-                    alert("Ensure both windows contain error-free JSON before comparing.");
+                    alert("Please verify both input boxes are error-free before executing comparison.");
                 }
             });
         });
