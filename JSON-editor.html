@@ -3,54 +3,149 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Our Team JSON Editor</title>
+    <title>Dual JSON Editor & Diff Tool</title>
 
-    <!-- Pointing directly to the local files you created in Steps 1 & 2 -->
-    <link href="jsoneditor.css" rel="stylesheet" type="text/css">
-    <script src="jsoneditor.js"></script>
+    <!-- Secure absolute CDN paths for styles and icons -->
+    <link href="https://unpkg.com" rel="stylesheet" type="text/css">
+    <script src="https://unpkg.com"></script>
 
     <style>
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            padding: 30px; 
+            padding: 20px; 
             background: #f4f4f9; 
+            margin: 0;
         }
-        #jsoneditor { 
-            width: 100%; 
-            height: 600px; 
-            margin-top: 20px;
+        h2 { margin-bottom: 10px; color: #333; }
+        
+        /* Layout for the control bar */
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            background: #fff;
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #388e3c;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover { background: #2e7d32; }
+        button.secondary { background: #0288d1; }
+        button.secondary:hover { background: #01579b; }
+
+        /* Side-by-side flexbox workspace */
+        .editor-container {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+            height: calc(100vh - 140px);
+            min-height: 500px;
+        }
+        .panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .panel-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        .editor-box {
+            flex: 1;
+            height: 100%;
         }
     </style>
 </head>
 <body>
 
-    <h2>Internal JSON Editor</h2>
-    <div id="jsoneditor"></div>
+    <h2>Dual JSON Editor & Sync Tool</h2>
+    
+    <!-- Middle-ware Operations Toolbar -->
+    <div class="controls">
+        <button class="secondary" id="copyLeftToRight">Copy Left ➔ Right</button>
+        <button class="secondary" id="copyRightToLeft">Copy Right ➔ Left</button>
+        <button id="compareJson">Quick Compare (Console)</button>
+    </div>
+
+    <!-- The Dual Workspace -->
+    <div class="editor-container">
+        <!-- Left Panel -->
+        <div class="panel">
+            <div class="panel-title">Left JSON (Source / Original)</div>
+            <div id="jsoneditor-left" class="editor-box"></div>
+        </div>
+        
+        <!-- Right Panel -->
+        <div class="panel">
+            <div class="panel-title">Right JSON (Target / Transformed)</div>
+            <div id="jsoneditor-right" class="editor-box"></div>
+        </div>
+    </div>
 
     <script>
         document.addEventListener("DOMContentLoaded", function() {
-            try {
-                const container = document.getElementById("jsoneditor");
-                
-                const options = {
-                    mode: 'tree',
-                    modes: ['tree', 'code', 'text', 'preview']
-                };
-                
-                // Construct the editor cleanly
-                const editor = new JSONEditor(container, options);
+            // Configuration options for both panels
+            const options = {
+                mode: 'tree',
+                modes: ['tree', 'code', 'text', 'preview']
+            };
+            
+            // Initialize both editor boxes independently
+            const editorLeft = new JSONEditor(document.getElementById("jsoneditor-left"), options);
+            const editorRight = new JSONEditor(document.getElementById("jsoneditor-right"), options);
 
-                const initialJson = { 
-                    "welcome": "Success!", 
-                    "status": "Your editor is live and locally hosted", 
-                    "security": "100% private. Data never leaves your tab." 
-                };
-                editor.set(initialJson);
-                
-                console.log("JSON Editor successfully mounted!");
-            } catch (error) {
-                console.error("Failed to initialize JSON Editor:", error);
-            }
+            // Seed initial sample data to test layout
+            editorLeft.set({ "id": 101, "name": "Package A", "items": ["zip", "rar"] });
+            editorRight.set({ "id": 101, "name": "Package B", "items": ["zip", "tar.gz"] });
+
+            // Action: Transform Left Data over to Right Editor
+            document.getElementById("copyLeftToRight").addEventListener("click", function() {
+                try {
+                    const data = editorLeft.get();
+                    editorRight.set(data);
+                } catch (e) {
+                    alert("Cannot copy: Left JSON code is invalid.");
+                }
+            });
+
+            // Action: Transform Right Data back over to Left Editor
+            document.getElementById("copyRightToLeft").addEventListener("click", function() {
+                try {
+                    const data = editorRight.get();
+                    editorLeft.set(data);
+                } catch (e) {
+                    alert("Cannot copy: Right JSON code is invalid.");
+                }
+            });
+
+            // Action: Basic structural comparison checker
+            document.getElementById("compareJson").addEventListener("click", function() {
+                try {
+                    const strLeft = JSON.stringify(editorLeft.get());
+                    const strRight = JSON.stringify(editorRight.get());
+                    
+                    if (strLeft === strRight) {
+                        alert("🎉 Both JSON windows match perfectly!");
+                    } else {
+                        alert("⚠️ Differences detected! Open your browser DevTools Console (F12) to see details.");
+                        console.log("Left Payload:", editorLeft.get());
+                        console.log("Right Payload:", editorRight.get());
+                    }
+                } catch (e) {
+                    alert("Ensure both windows contain error-free JSON before comparing.");
+                }
+            });
         });
     </script>
 </body>
