@@ -3,15 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ORO labs JSON Editor</title>
+    <title>Our Team JSON Editor</title>
 
-    <!-- Include JSON Editor CSS and JS from CDN -->
-    <link href="https://cloudflare.com" rel="stylesheet" type="text/css">
-    <script src="https://cloudflare.com"></script>
+    <!-- Pointing directly to the local files you created in Steps 1 & 2 -->
+    <link href="jsoneditor.css" rel="stylesheet" type="text/css">
+    <script src="jsoneditor.js"></script>
 
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f4f4f9; }
-        #jsoneditor { width: 100%; height: 500px; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            padding: 30px; 
+            background: #f4f4f9; 
+        }
+        #jsoneditor { 
+            width: 100%; 
+            height: 600px; 
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
@@ -20,21 +28,30 @@
     <div id="jsoneditor"></div>
 
     <script>
-        // Target the container element
-        const container = document.getElementById("jsoneditor");
-        
-        // Configuration choices (Tree view, Code view, etc.)
-        const options = {
-            mode: 'tree',
-            modes: ['tree', 'code', 'text', 'preview'] 
-        };
-        
-        // Initialize the editor
-        const editor = new JSONEditor(container, options);
+        document.addEventListener("DOMContentLoaded", function() {
+            try {
+                const container = document.getElementById("jsoneditor");
+                
+                const options = {
+                    mode: 'tree',
+                    modes: ['tree', 'code', 'text', 'preview']
+                };
+                
+                // Construct the editor cleanly
+                const editor = new JSONEditor(container, options);
 
-        // Optional: Set initial placeholder data
-        const initialJson = { "welcome": "Hello Team!", "project": "JSON Testing", "active": true };
-        editor.set(initialJson);
+                const initialJson = { 
+                    "welcome": "Success!", 
+                    "status": "Your editor is live and locally hosted", 
+                    "security": "100% private. Data never leaves your tab." 
+                };
+                editor.set(initialJson);
+                
+                console.log("JSON Editor successfully mounted!");
+            } catch (error) {
+                console.error("Failed to initialize JSON Editor:", error);
+            }
+        });
     </script>
 </body>
 </html>
